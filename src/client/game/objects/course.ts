@@ -2,6 +2,7 @@ import { Box3, Group, Vector3, type Mesh } from 'three';
 import type { CourseDefinition } from '../../../shared/types/course';
 import type { Updatable } from '../engine/types';
 import { createBall, createTee } from './ball';
+import { createBridges } from './bridges';
 import { createCup } from './cup';
 import type { Materials } from './materials';
 import { createObstacles } from './obstacles';
@@ -40,6 +41,7 @@ export const createCourseScene = (
   root.add(
     terrain.group,
     createWalls(course.outline, materials),
+    createBridges(course.bridges, materials),
     createTee(course.tee, ball, materials),
     cup.group,
     obstacles.group,

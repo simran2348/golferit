@@ -20,8 +20,15 @@
   "menu": {
     "items": [
       {
-        "label": "Create a new post",
-        "description": "Create a new Golferit mini golf post",
+        "label": "Post today's daily challenge",
+        "description": "Create today's Golferit daily challenge (if not already posted)",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/daily-post"
+      },
+      {
+        "label": "Create a practice post",
+        "description": "Create a Golferit practice post on a random hole",
         "location": "subreddit",
         "forUserType": "moderator",
         "endpoint": "/internal/menu/post-create"
@@ -30,6 +37,14 @@
   },
   "triggers": {
     "onAppInstall": "/internal/triggers/on-app-install"
+  },
+  "scheduler": {
+    "tasks": {
+      "daily-challenge": {
+        "endpoint": "/internal/scheduler/daily-challenge",
+        "cron": "0 0 * * *"
+      }
+    }
   },
   "scripts": {
     "dev": "vite build --watch",

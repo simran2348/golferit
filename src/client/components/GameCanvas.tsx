@@ -3,17 +3,19 @@ import WebGL from 'three/addons/capabilities/WebGL.js';
 import type { CourseDefinition } from '../../shared/types/course';
 import { GameEngine } from '../game/engine/GameEngine';
 import type { GameSession } from '../game/logic/GameSession';
+import type { ZoomController } from '../game/engine/ZoomController';
 
 type GameCanvasProps = {
   course: CourseDefinition;
   session: GameSession;
+  zoom: ZoomController;
 };
 
 /**
  * Mounts the imperative GameEngine into a div. React renders this component
  * once; the engine's frame loop never touches React state.
  */
-export const GameCanvas = ({ course, session }: GameCanvasProps) => {
+export const GameCanvas = ({ course, session, zoom }: GameCanvasProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [webglAvailable] = useState(() => WebGL.isWebGL2Available());
 
@@ -21,11 +23,11 @@ export const GameCanvas = ({ course, session }: GameCanvasProps) => {
     const container = containerRef.current;
     if (!container || !webglAvailable) return;
 
-    const engine = new GameEngine(container, course, session);
+    const engine = new GameEngine(container, course, session, zoom);
     engine.start();
     // Runs on unmount and before StrictMode's dev re-mount.
     return () => engine.dispose();
-  }, [course, session, webglAvailable]);
+  }, [course, session, zoom, webglAvailable]);
 
   if (!webglAvailable) {
     return (

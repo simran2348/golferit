@@ -1,5 +1,7 @@
 import type { CourseDefinition } from '../../shared/types/course';
 import { formatDuration } from '../../shared/scoring';
+import { postLabel, type GolferitPostData } from '../../shared/daily';
+import type { StreakInfo } from '../../shared/api';
 import type { GameSnapshot } from '../game/logic/GameSession';
 import type { PlayerState } from '../hooks/usePlayer';
 import type { ScoreboardState } from '../services/ScoreboardStore';
@@ -7,6 +9,7 @@ import { RoundTimer } from './RoundTimer';
 
 type HudProps = {
   course: CourseDefinition;
+  post: GolferitPostData;
   player: PlayerState;
   snapshot: GameSnapshot;
   scoreboard: ScoreboardState;
@@ -44,8 +47,19 @@ const chip =
   'rounded-2xl bg-white/90 shadow-lg shadow-sky-900/20 backdrop-blur';
 
 /** Read-only overlay. pointer-events-none so it never blocks the canvas. */
+/** Latest known streak: from the last saved round, else from init. */
+const currentStreak = (
+  player: PlayerState,
+  scoreboard: ScoreboardState
+): StreakInfo | null => {
+  const { submission } = scoreboard;
+  if (submission.status === 'saved') return submission.result.streak;
+  return player.status === 'ready' ? player.streak : null;
+};
+
 export const Hud = ({
   course,
+  post,
   player,
   snapshot,
   scoreboard,
@@ -53,6 +67,7 @@ export const Hud = ({
 }: HudProps) => {
   const status = statusMessage(snapshot);
   const best = scoreboard.leaderboard?.me ?? null;
+  const streak = currentStreak(player, scoreboard);
   return (
     <div className="pointer-events-none absolute inset-0 flex flex-col justify-between p-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-4">
       {/* Two rows so it fits a 360px phone without wrapping:
@@ -62,7 +77,7 @@ export const Hud = ({
         <div className="flex items-start justify-between gap-2">
           <div className={`${chip} min-w-0 px-3 py-1.5 sm:px-4 sm:py-2`}>
             <p className="text-[10px] font-bold tracking-widest whitespace-nowrap text-emerald-600 uppercase sm:text-xs">
-              Hole 1 · Par {course.par}
+              {postLabel(post)} · Par {course.par}
             </p>
             <h1 className="truncate text-base leading-tight font-extrabold text-slate-800 sm:text-xl">
               {course.name}
@@ -107,11 +122,23 @@ export const Hud = ({
               />
             </div>
           </div>
-          {best ? (
-            <span className="rounded-full bg-white/80 px-2.5 py-1 text-[11px] font-semibold whitespace-nowrap text-slate-600 shadow backdrop-blur sm:text-xs">
-              Best {best.strokes} · {formatDuration(best.timeMs)} · #{best.rank}
-            </span>
-          ) : null}
+          <div className="flex flex-col items-end gap-1.5">
+            {best ? (
+              <span className="rounded-full bg-white/80 px-2.5 py-1 text-[11px] font-semibold whitespace-nowrap text-slate-600 shadow backdrop-blur sm:text-xs">
+                Best {best.strokes} · {formatDuration(best.timeMs)} · #
+                {best.rank}
+              </span>
+            ) : null}
+            {streak && streak.current > 0 ? (
+              <span
+                className="rounded-full bg-orange-500/90 px-2.5 py-1 text-[11px] font-bold whitespace-nowrap text-white shadow backdrop-blur sm:text-xs"
+                title={`Best streak: ${streak.best} days`}
+              >
+                🔥 {streak.current}-day streak
+                {streak.playedToday ? '' : ' · play today!'}
+              </span>
+            ) : null}
+          </div>
         </div>
       </div>
 
@@ -127,7 +154,7 @@ export const Hud = ({
 
       {status ? (
         <p
-          className={`${chip} self-center px-4 py-2 text-center text-xs font-semibold text-slate-700 sm:text-sm`}
+          className={`${chip} max-w-[calc(100%-8rem)] self-center px-4 py-2 text-center text-xs font-semibold text-slate-700 sm:text-sm`}
         >
           {status}
         </p>

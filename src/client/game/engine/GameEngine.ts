@@ -1,10 +1,4 @@
-import {
-  Scene,
-  Vector3,
-  type Mesh,
-  type OrthographicCamera,
-  type WebGLRenderer,
-} from 'three';
+import { Scene, Vector3, type Mesh, type WebGLRenderer } from 'three';
 import type { CourseDefinition } from '../../../shared/types/course';
 import { ShotControls, type Aim } from '../controls/ShotControls';
 import type { GameSession } from '../logic/GameSession';
@@ -14,12 +8,13 @@ import { createCourseScene } from '../objects/course';
 import { createMaterials } from '../objects/materials';
 import { loadPhysics } from '../physics/loadPhysics';
 import type { PhysicsWorld } from '../physics/PhysicsWorld';
-import { createIsometricCamera, fitCameraToPoints } from './camera';
+import { CameraRig } from './camera';
 import { disposeObject3D, disposeRenderer } from './dispose';
 import { createEnvironment } from './environment';
 import { createLighting } from './lighting';
 import { createRenderer, isCoarsePointer } from './renderer';
 import type { Updatable } from './types';
+import type { ZoomController } from './ZoomController';
 
 /** Long frames (tab switch, debugger) must not teleport animations. */
 const MAX_FRAME_DELTA = 0.1;
@@ -40,7 +35,7 @@ type Gameplay = {
 export class GameEngine {
   private readonly renderer: WebGLRenderer;
   private readonly scene = new Scene();
-  private readonly camera: OrthographicCamera;
+  private readonly rig: CameraRig;
   private readonly framingPoints: Vector3[];
   private readonly updatables: Updatable[];
   private readonly resizeObserver: ResizeObserver;
@@ -55,7 +50,8 @@ export class GameEngine {
   constructor(
     private readonly container: HTMLElement,
     private readonly course: CourseDefinition,
-    private readonly session: GameSession
+    private readonly session: GameSession,
+    private readonly zoom: ZoomController
   ) {
     this.renderer = createRenderer();
     container.appendChild(this.renderer.domElement);
@@ -77,7 +73,7 @@ export class GameEngine {
       createLighting(shadowBounds, isCoarsePointer() ? 1024 : 2048)
     );
 
-    this.camera = createIsometricCamera(course3d.framingCenter);
+    this.rig = new CameraRig(course3d.framingCenter);
 
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(container);
@@ -134,7 +130,7 @@ export class GameEngine {
     );
     const controls = new ShotControls({
       element: this.renderer.domElement,
-      camera: this.camera,
+      camera: this.rig.camera,
       canAim: () => this.session.canShoot(),
       getBallPosition: (target) => target.copy(this.ball.position),
       onAimChange: (aim) => {
@@ -156,6 +152,8 @@ export class GameEngine {
     this.elapsed += delta;
 
     this.gameplay?.system.update(delta);
+    this.rig.setZoom(this.zoom.getSnapshot().zoom);
+    this.rig.update(delta, this.ball.position);
     for (const updatable of this.updatables) {
       updatable.update(this.elapsed, delta);
     }
@@ -165,7 +163,7 @@ export class GameEngine {
       this.aim,
       this.elapsed
     );
-    this.renderer.render(this.scene, this.camera);
+    this.renderer.render(this.scene, this.rig.camera);
   }
 
   private resize(): void {
@@ -174,8 +172,8 @@ export class GameEngine {
     if (width === 0 || height === 0) return;
     // `false`: CSS already sizes the canvas to the container.
     this.renderer.setSize(width, height, false);
-    fitCameraToPoints(this.camera, this.framingPoints, width / height);
+    this.rig.fit(this.framingPoints, width / height);
     // Render immediately so resizing never shows a stretched frame.
-    this.renderer.render(this.scene, this.camera);
+    this.renderer.render(this.scene, this.rig.camera);
   }
 }

@@ -42,7 +42,48 @@ export type BumperObstacle = {
   radius: number;
 };
 
-export type Obstacle = WindmillObstacle | BumperObstacle;
+/** A block that slides back and forth: offset = sin(t * speed + phase) * travel. */
+export type SliderObstacle = {
+  kind: 'slider';
+  id: string;
+  /** Centre of travel. */
+  position: Vec2;
+  /** Radians. At 0 the block travels along X. */
+  rotationY: number;
+  /** Half the travel distance. */
+  travel: number;
+  /** Angular speed in radians per second. */
+  speed: number;
+  phase: number;
+  /** Block footprint: `length` along the travel axis, `width` across it. */
+  length: number;
+  width: number;
+};
+
+/**
+ * Arched tunnel. Local frame: passage runs along X. The two side blocks are
+ * solid; the ball rolls through the `innerWidth` gap and hides under the roof.
+ */
+export type TunnelObstacle = {
+  kind: 'tunnel';
+  id: string;
+  position: Vec2;
+  rotationY: number;
+  length: number;
+  innerWidth: number;
+  outerWidth: number;
+};
+
+export type Obstacle =
+  WindmillObstacle | BumperObstacle | SliderObstacle | TunnelObstacle;
+
+/** Wooden plank across water. On the plank you're safe; off it, splash. */
+export type Bridge = {
+  id: string;
+  from: Vec2;
+  to: Vec2;
+  width: number;
+};
 
 export type SceneryItem = {
   kind: 'tree' | 'rock';
@@ -67,6 +108,7 @@ export type CourseDefinition = {
   tee: Vec2;
   cup: Vec2;
   water: WaterHazard[];
+  bridges: Bridge[];
   obstacles: Obstacle[];
   /** Decoration on the island rough around the course (not collidable). */
   scenery: SceneryItem[];

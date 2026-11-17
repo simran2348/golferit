@@ -27,6 +27,8 @@ export const PALETTE = {
   trunk: '#7a4b2a',
   foliage: '#3ea852',
   rock: '#a7a9ac',
+  stone: '#c9c2b4',
+  plank: '#b07a45',
 } as const;
 
 /** Mown-stripe grass texture generated at runtime: no image download needed. */
@@ -82,6 +84,13 @@ export const createMaterials = () => ({
   trunk: flat(PALETTE.trunk),
   foliage: flat(PALETTE.foliage),
   rock: flat(PALETTE.rock),
+  stone: flat(PALETTE.stone),
+  plank: flat(PALETTE.plank),
+  tunnelRoof: new MeshLambertMaterial({
+    color: PALETTE.windmillRoof,
+    side: DoubleSide,
+    flatShading: true,
+  }),
 });
 
 export type Materials = ReturnType<typeof createMaterials>;

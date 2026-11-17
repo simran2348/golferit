@@ -5,7 +5,7 @@ import type { CourseDefinition } from '../types/course';
  * the windmill tunnel, bank off the chamfered corner, past the pond and
  * bumpers to the cup in the north-east.
  */
-export const STARTER_COURSE: CourseDefinition = {
+export const MEADOW_MILL: CourseDefinition = {
   id: 'starter-meadow-mill',
   name: 'Meadow Mill',
   par: 3,
@@ -35,6 +35,7 @@ export const STARTER_COURSE: CourseDefinition = {
       ],
     },
   ],
+  bridges: [],
   obstacles: [
     {
       kind: 'windmill',

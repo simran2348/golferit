@@ -1,9 +1,14 @@
 import { useEffect, useState } from 'react';
-import type { InitResponse } from '../../shared/api';
+import type { InitResponse, ScoreEntry, StreakInfo } from '../../shared/api';
 
 export type PlayerState =
   | { status: 'loading' }
-  | { status: 'ready'; username: string | null }
+  | {
+      status: 'ready';
+      username: string | null;
+      best: ScoreEntry | null;
+      streak: StreakInfo | null;
+    }
   | { status: 'error' };
 
 const isInitResponse = (value: unknown): value is InitResponse =>
@@ -27,7 +32,12 @@ export const usePlayer = (): PlayerState => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data: unknown = await res.json();
         if (!isInitResponse(data)) throw new Error('Unexpected response');
-        setState({ status: 'ready', username: data.username });
+        setState({
+          status: 'ready',
+          username: data.username,
+          best: data.best,
+          streak: data.streak,
+        });
       } catch (err) {
         if (controller.signal.aborted) return;
         console.error('Failed to load player', err);

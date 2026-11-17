@@ -1,8 +1,22 @@
+import type { GolferitPostData } from './daily';
+
+export type StreakInfo = {
+  /** Consecutive UTC days with a completed daily challenge (0 if broken). */
+  current: number;
+  best: number;
+  playedToday: boolean;
+};
+
 export type InitResponse = {
   type: 'init';
   postId: string;
   /** Resolved server-side from trusted Devvit context; null when logged out. */
   username: string | null;
+  post: GolferitPostData;
+  /** Viewer's best on this post; null if none or logged out. */
+  best: ScoreEntry | null;
+  /** Null when logged out. */
+  streak: StreakInfo | null;
 };
 
 export type ErrorCode = 'unauthenticated' | 'invalid' | 'not_found' | 'server';
@@ -61,4 +75,7 @@ export type SubmitRoundResponse = {
   timeMs: number;
   isPersonalBest: boolean;
   leaderboard: LeaderboardResponse;
+  streak: StreakInfo | null;
+  /** True when this round counted toward the daily streak. */
+  countedForStreak: boolean;
 };

@@ -14,6 +14,9 @@ export const WALL_BASE_Y = -0.06;
 export const WALL_POST_SIZE = WALL_THICKNESS * 1.5;
 
 export const BUMPER_HEIGHT = 0.36;
+export const SLIDER_HEIGHT = 0.42;
+/** Tunnel side walls; the arched roof above is visual only (out of reach). */
+export const TUNNEL_WALL_HEIGHT = 0.5;
 
 /** Width of the grassy rough between the wooden walls and the island edge. */
 export const ISLAND_MARGIN = 1.4;

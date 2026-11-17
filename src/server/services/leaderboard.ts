@@ -69,3 +69,17 @@ export const getLeaderboard = async (
     totalPlayers,
   };
 };
+
+/** The viewer's best on a post without fetching the whole board. */
+export const getPersonalBest = async (
+  postId: string,
+  userId: string
+): Promise<ScoreEntry | null> => {
+  const [rank, score, names] = await Promise.all([
+    redis.zRank(scoresKey(postId), userId),
+    redis.zScore(scoresKey(postId), userId),
+    redis.hMGet(namesKey(postId), [userId]),
+  ]);
+  if (rank === undefined || score === undefined) return null;
+  return toEntry(rank + 1, names[0] ?? 'unknown', score);
+};

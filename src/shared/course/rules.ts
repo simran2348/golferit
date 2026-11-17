@@ -1,4 +1,4 @@
-import type { CourseDefinition, Vec2 } from '../types/course';
+import type { Bridge, CourseDefinition, Vec2 } from '../types/course';
 import {
   CUP_CAPTURE_SPEED,
   CUP_RADIUS,
@@ -20,11 +20,27 @@ export const isBallInCup = (
   Math.hypot(position.x - course.cup.x, position.z - course.cup.z) <
     CUP_RADIUS && horizontalSpeed < CUP_CAPTURE_SPEED;
 
+export const isOnBridge = (position: Vec2, bridge: Bridge): boolean => {
+  const dx = bridge.to.x - bridge.from.x;
+  const dz = bridge.to.z - bridge.from.z;
+  const length = Math.hypot(dx, dz);
+  if (length === 0) return false;
+  const ux = dx / length;
+  const uz = dz / length;
+  const px = position.x - bridge.from.x;
+  const pz = position.z - bridge.from.z;
+  const along = px * ux + pz * uz;
+  const across = Math.abs(px * -uz + pz * ux);
+  return along >= 0 && along <= length && across <= bridge.width / 2;
+};
+
+/** Ball centre over a pond and not on a bridge. */
 export const isBallInWater = (
   position: Vec2,
   course: CourseDefinition
 ): boolean =>
-  course.water.some((pond) => isPointInPolygon(position, pond.outline));
+  course.water.some((pond) => isPointInPolygon(position, pond.outline)) &&
+  !course.bridges.some((bridge) => isOnBridge(position, bridge));
 
 export const isBallOutOfBounds = (
   position: Vec2 & { y: number },

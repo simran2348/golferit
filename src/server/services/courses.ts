@@ -1,9 +1,17 @@
+import { context } from '@devvit/web/server';
 import type { CourseDefinition } from '../../shared/types/course';
-import { STARTER_COURSE } from '../../shared/constants/courses';
+import {
+  courseForPost,
+  parsePostData,
+  type GolferitPostData,
+} from '../../shared/daily';
 
 /**
- * Course played on a given post. Every post currently plays the starter hole;
- * when community courses arrive this becomes a Redis lookup by postId.
+ * Post metadata set by this app at post creation (`postData`), read from the
+ * trusted request context. Older posts without it play the default course.
  */
-export const getCourseForPost = (_postId: string): CourseDefinition =>
-  STARTER_COURSE;
+export const getPostData = (): GolferitPostData =>
+  parsePostData(context.postData);
+
+export const getCourseForCurrentPost = (): CourseDefinition =>
+  courseForPost(getPostData());

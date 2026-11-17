@@ -8,6 +8,8 @@ import {
 import { Euler, Quaternion, Vector3 } from 'three';
 import type {
   CourseDefinition,
+  SliderObstacle,
+  TunnelObstacle,
   Vec2,
   WindmillObstacle,
 } from '../../../shared/types/course';
@@ -16,11 +18,16 @@ import {
   buildWallSegments,
   polygonBounds,
 } from '../../../shared/course/geometry';
-import { windmillBladeAngle } from '../../../shared/course/obstacles';
+import {
+  sliderOffset,
+  windmillBladeAngle,
+} from '../../../shared/course/obstacles';
 import {
   BALL_RADIUS,
   BUMPER_HEIGHT,
   PHYSICS_STEP,
+  SLIDER_HEIGHT,
+  TUNNEL_WALL_HEIGHT,
   WALL_BASE_Y,
   WALL_POST_SIZE,
   WALL_THICKNESS,
@@ -43,6 +50,14 @@ type Windmill = {
   yaw: Quaternion;
 };
 
+type Slider = {
+  definition: SliderObstacle;
+  body: RigidBody;
+  /** Unit travel direction on the XZ plane. */
+  axisX: number;
+  axisZ: number;
+};
+
 const scratchQuat = new Quaternion();
 const scratchEuler = new Euler();
 
@@ -56,6 +71,7 @@ export class PhysicsWorld {
   private readonly world: World;
   private readonly ballBody: RigidBody;
   private readonly windmills: Windmill[] = [];
+  private readonly sliders: Slider[] = [];
   /** Simulation clock, seconds. Starts at the engine's clock to stay in sync. */
   time: number;
 
@@ -99,6 +115,14 @@ export class PhysicsWorld {
         )
         .premultiply(windmill.yaw);
       windmill.blades.setNextKinematicRotation(scratchQuat);
+    }
+    for (const slider of this.sliders) {
+      const offset = sliderOffset(slider.definition, this.time);
+      slider.body.setNextKinematicTranslation({
+        x: slider.definition.position.x + slider.axisX * offset,
+        y: SLIDER_HEIGHT / 2,
+        z: slider.definition.position.z + slider.axisZ * offset,
+      });
     }
     this.world.step();
   }
@@ -217,6 +241,12 @@ export class PhysicsWorld {
         case 'windmill':
           this.createWindmill(obstacle, body);
           break;
+        case 'slider':
+          this.createSlider(obstacle);
+          break;
+        case 'tunnel':
+          this.createTunnel(obstacle, body);
+          break;
       }
     }
   }
@@ -282,6 +312,61 @@ export class PhysicsWorld {
       );
     }
     this.windmills.push({ definition: windmill, blades, yaw });
+  }
+
+  private createSlider(slider: SliderObstacle): void {
+    const axisX = Math.cos(slider.rotationY);
+    const axisZ = -Math.sin(slider.rotationY);
+    const offset = sliderOffset(slider, this.time);
+    const body = this.world.createRigidBody(
+      RigidBodyDesc.kinematicPositionBased()
+        .setTranslation(
+          slider.position.x + axisX * offset,
+          SLIDER_HEIGHT / 2,
+          slider.position.z + axisZ * offset
+        )
+        .setRotation(yawQuaternion(slider.rotationY))
+    );
+    this.world.createCollider(
+      this.bouncy(
+        ColliderDesc.cuboid(
+          slider.length / 2,
+          SLIDER_HEIGHT / 2,
+          slider.width / 2
+        )
+      ),
+      body
+    );
+    this.sliders.push({ definition: slider, body, axisX, axisZ });
+  }
+
+  private createTunnel(tunnel: TunnelObstacle, statics: RigidBody): void {
+    const sideWidth = (tunnel.outerWidth - tunnel.innerWidth) / 2;
+    const yaw = new Quaternion().setFromAxisAngle(
+      new Vector3(0, 1, 0),
+      tunnel.rotationY
+    );
+    for (const side of [-1, 1]) {
+      const center = new Vector3(
+        0,
+        TUNNEL_WALL_HEIGHT / 2,
+        (side * (tunnel.innerWidth + sideWidth)) / 2
+      )
+        .applyQuaternion(yaw)
+        .add(new Vector3(tunnel.position.x, 0, tunnel.position.z));
+      this.world.createCollider(
+        this.bouncy(
+          ColliderDesc.cuboid(
+            tunnel.length / 2,
+            TUNNEL_WALL_HEIGHT / 2,
+            sideWidth / 2
+          )
+        )
+          .setTranslation(center.x, center.y, center.z)
+          .setRotation(yaw),
+        statics
+      );
+    }
   }
 
   private bouncy(desc: ColliderDesc): ColliderDesc {

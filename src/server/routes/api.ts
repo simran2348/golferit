@@ -7,8 +7,14 @@ import type {
   StartRoundResponse,
   SubmitRoundResponse,
 } from '../../shared/api';
-import { getCourseForPost } from '../services/courses';
-import { getLeaderboard, recordScore } from '../services/leaderboard';
+import { utcDateKey } from '../../shared/daily';
+import { getCourseForCurrentPost, getPostData } from '../services/courses';
+import {
+  getLeaderboard,
+  getPersonalBest,
+  recordScore,
+} from '../services/leaderboard';
+import { getStreak, recordDailyCompletion } from '../services/streaks';
 import { consumeRound, startRound } from '../services/rounds';
 import { parseSubmitRequest, validateRound } from '../services/roundValidation';
 
@@ -32,14 +38,22 @@ const describe = (error: unknown) =>
  * the request body.
  */
 api.get('/init', async (c) => {
-  const { postId } = context;
+  const { postId, userId } = context;
   if (!postId) return fail(c, 'invalid', 'postId missing from context');
   try {
-    const username = await reddit.getCurrentUsername();
+    const today = utcDateKey(new Date());
+    const [username, best, streak] = await Promise.all([
+      reddit.getCurrentUsername(),
+      userId ? getPersonalBest(postId, userId) : null,
+      userId ? getStreak(userId, today) : null,
+    ]);
     return c.json<InitResponse>({
       type: 'init',
       postId,
       username: username ?? null,
+      post: getPostData(),
+      best,
+      streak,
     });
   } catch (error) {
     console.error(`Init failed for post ${postId}:`, error);
@@ -97,7 +111,7 @@ api.post('/round/submit', async (c) => {
 
     const result = validateRound(
       request,
-      getCourseForPost(postId),
+      getCourseForCurrentPost(),
       receivedAt - round.startedAt
     );
     if (typeof result === 'string') {
@@ -114,12 +128,25 @@ api.post('/round/submit', async (c) => {
       result.timeMs,
       request.shots
     );
+
+    // Streaks count only today's daily challenge, played today (UTC).
+    const today = utcDateKey(new Date(receivedAt));
+    const post = getPostData();
+    const countedForStreak = post.kind === 'daily' && post.date === today;
+    const [leaderboard, streak] = await Promise.all([
+      getLeaderboard(postId, userId),
+      countedForStreak
+        ? recordDailyCompletion(userId, today)
+        : getStreak(userId, today),
+    ]);
     return c.json<SubmitRoundResponse>({
       type: 'roundSubmitted',
       strokes: result.strokes,
       timeMs: result.timeMs,
       isPersonalBest,
-      leaderboard: await getLeaderboard(postId, userId),
+      leaderboard,
+      streak,
+      countedForStreak,
     });
   } catch (error) {
     console.error(`Round submit failed for post ${postId}:`, error);

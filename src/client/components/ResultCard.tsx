@@ -1,4 +1,5 @@
 import { formatDuration } from '../../shared/scoring';
+import type { GolferitPostData } from '../../shared/daily';
 import type { GameResult } from '../game/logic/GameSession';
 import type {
   ScoreboardState,
@@ -8,6 +9,7 @@ import { LeaderboardList } from './LeaderboardList';
 
 type ResultCardProps = {
   result: GameResult;
+  post: GolferitPostData;
   scoreboard: ScoreboardState;
   onPlayAgain: () => void;
 };
@@ -18,7 +20,13 @@ const relativeToPar = (strokes: number, par: number): string => {
   return diff < 0 ? `${-diff} under par` : `${diff} over par`;
 };
 
-const SaveStatus = ({ submission }: { submission: SubmissionState }) => {
+const SaveStatus = ({
+  submission,
+  post,
+}: {
+  submission: SubmissionState;
+  post: GolferitPostData;
+}) => {
   switch (submission.status) {
     case 'idle':
       return null;
@@ -36,10 +44,27 @@ const SaveStatus = ({ submission }: { submission: SubmissionState }) => {
       const { result } = submission;
       const me = result.leaderboard.me;
       return (
-        <p className="text-sm font-semibold text-emerald-700">
-          {result.isPersonalBest ? '★ New personal best! ' : 'Score saved. '}
-          {me ? `Rank #${me.rank} of ${result.leaderboard.totalPlayers}` : null}
-        </p>
+        <div className="flex flex-col gap-1">
+          <p className="text-sm font-semibold text-emerald-700">
+            {result.isPersonalBest ? '★ New personal best! ' : 'Score saved. '}
+            {me
+              ? `Rank #${me.rank} of ${result.leaderboard.totalPlayers}`
+              : null}
+          </p>
+          {result.countedForStreak && result.streak ? (
+            <p className="text-sm font-bold text-orange-600">
+              🔥 {result.streak.current}-day streak
+              {result.streak.current >= result.streak.best &&
+              result.streak.current > 1
+                ? ' (your best!)'
+                : ''}
+            </p>
+          ) : post.kind === 'daily' ? (
+            <p className="text-xs text-slate-500">
+              Streaks count on the day&apos;s challenge only.
+            </p>
+          ) : null}
+        </div>
       );
     }
   }
@@ -47,6 +72,7 @@ const SaveStatus = ({ submission }: { submission: SubmissionState }) => {
 
 export const ResultCard = ({
   result,
+  post,
   scoreboard,
   onPlayAgain,
 }: ResultCardProps) => {
@@ -101,7 +127,9 @@ export const ResultCard = ({
           </div>
         </div>
 
-        {result.holed ? <SaveStatus submission={submission} /> : null}
+        {result.holed ? (
+          <SaveStatus submission={submission} post={post} />
+        ) : null}
 
         {leaderboard && leaderboard.entries.length > 0 ? (
           <div className="text-left">
