@@ -1,10 +1,15 @@
 import type {
+  DraftResponse,
   ErrorCode,
+  JoinIntentResponse,
+  SaveDraftResponse,
+  SubscribeResponse,
   LeaderboardResponse,
   StartRoundResponse,
   SubmitRoundRequest,
   SubmitRoundResponse,
 } from '../../shared/api';
+import type { CourseDesign } from '../../shared/editor/design';
 
 export class ApiError extends Error {
   constructor(
@@ -30,6 +35,7 @@ const errorCodeOf = (value: unknown): ErrorCode | null => {
   }
   const { code } = value;
   return code === 'unauthenticated' ||
+    code === 'forbidden' ||
     code === 'invalid' ||
     code === 'not_found' ||
     code === 'server'
@@ -69,11 +75,12 @@ const request = async <T extends { type: string }>(
   return data;
 };
 
-const postJson = (body: unknown): RequestInit => ({
-  method: 'POST',
+const sendJson = (body: unknown, method = 'POST'): RequestInit => ({
+  method,
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify(body),
 });
+const postJson = (body: unknown) => sendJson(body);
 
 const isLeaderboard = (v: unknown): v is LeaderboardResponse =>
   hasType(v, 'leaderboard') && 'entries' in v && Array.isArray(v.entries);
@@ -92,3 +99,27 @@ export const startRound = () =>
 
 export const submitRound = (body: SubmitRoundRequest) =>
   request('/api/round/submit', isRoundSubmitted, postJson(body));
+
+const isDraft = (v: unknown): v is DraftResponse =>
+  hasType(v, 'draft') && 'design' in v;
+const isDraftSaved = (v: unknown): v is SaveDraftResponse =>
+  hasType(v, 'draftSaved');
+
+export const fetchDraft = () => request('/api/editor/draft', isDraft);
+
+export const saveDraft = (design: CourseDesign) =>
+  request('/api/editor/draft', isDraftSaved, sendJson({ design }, 'PUT'));
+
+const isSubscribed = (v: unknown): v is SubscribeResponse =>
+  hasType(v, 'subscribed');
+
+/** Join the subreddit the app is installed in, as the current user. */
+export const subscribeToSubreddit = () =>
+  request('/api/subscribe', isSubscribed, postJson({}));
+
+const isJoinIntent = (v: unknown): v is JoinIntentResponse =>
+  hasType(v, 'joinIntent');
+
+/** Remember a Join tap server-side so it survives Reddit's consent reload. */
+export const markJoinIntent = () =>
+  request('/api/join/intent', isJoinIntent, postJson({}));

@@ -1,5 +1,9 @@
 import { redis, reddit } from '@devvit/web/server';
-import { COURSE_CATALOG, DEFAULT_COURSE } from '../../shared/courses';
+import {
+  COURSE_CATALOG,
+  DEFAULT_COURSE,
+  getCourseById,
+} from '../../shared/courses';
 import {
   courseForDate,
   dailyPostData,
@@ -29,9 +33,12 @@ export const ensureDailyPost = async (
   return { postId: post.id, created: true };
 };
 
-/** Free-play post on a random hole. No streak; its own leaderboard. */
-export const createPracticePost = async (): Promise<{ postId: string }> => {
+/** Free-play post on a chosen (or random) hole. No streak; its own board. */
+export const createPracticePost = async (
+  courseId?: string
+): Promise<{ postId: string }> => {
   const course =
+    (courseId ? getCourseById(courseId) : undefined) ??
     COURSE_CATALOG[Math.floor(Math.random() * COURSE_CATALOG.length)] ??
     DEFAULT_COURSE;
   const postData: PracticePostData = { kind: 'practice', courseId: course.id };

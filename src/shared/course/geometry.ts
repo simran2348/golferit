@@ -100,7 +100,8 @@ export const buildWallSegments = (
 };
 
 /**
- * Grow a simple polygon outward by `distance` using mitred corners. Miters are
+ * Grow (positive) or shrink (negative) a simple polygon by `distance` using
+ * mitred corners. Miters are
  * clamped so very sharp corners don't spike.
  */
 export const offsetPolygon = (
@@ -120,7 +121,12 @@ export const offsetPolygon = (
     const dirX = mx / mLength;
     const dirZ = mz / mLength;
     const cos = dirX * n1.x + dirZ * n1.z;
-    const scale = Math.min(distance / Math.max(cos, 1e-3), distance * 3);
+    // Clamp miters (works for negative distances too, i.e. insetting).
+    const magnitude = Math.min(
+      Math.abs(distance) / Math.max(cos, 1e-3),
+      Math.abs(distance) * 3
+    );
+    const scale = Math.sign(distance) * magnitude;
     return { x: point.x + dirX * scale, z: point.z + dirZ * scale };
   });
 };

@@ -30,6 +30,24 @@ Every day a new **Daily Challenge** post appears with one of the built-in holes.
 - Works with mouse and touch; responsive from 360 px phones to desktop
 - Server-timed and server-validated scores, personal bests, and a leaderboard per post (Devvit Redis)
 
+## Joining the subreddit
+
+The splash shows a **＋ Join r/…** button to logged-in viewers. It calls `reddit.subscribeToCurrentSubreddit()` as the user, so it always joins **whichever subreddit the app is installed in**: the test sub during development, the public sub after launch, with no code change. This requires `"asUser": ["SUBSCRIBE_TO_SUBREDDIT"]` under `permissions.reddit` in `devvit.json`.
+
+Reddit doesn't let apps read a user's subscriptions, so the app remembers who joined through the button (`joined:<userId>` in Redis) and shows "✓ Joined" from then on. Someone who joined another way still sees the button; tapping it is a harmless no-op.
+
+## Course editor
+
+Tap **🛠 Build your own course** on any Golferit post to open the editor.
+
+- **Paint** track and water on a 10 × 14 grid. Walls are generated around the track automatically.
+- **Place** the tee, the cup, bumpers, windmills and sliders. Tap a windmill or slider again to rotate it.
+- **Undo** steps back one stroke at a time. Drafts **autosave to the server** (one per player), so they survive app updates and follow you across devices.
+- The status bar explains anything that would stop the course from working: no tee or cup, disconnected track, tiles touching only at a corner, track surrounding empty space, and so on.
+- **▶ Test** plays the draft in the real 3D engine. Nothing is submitted to any leaderboard. Sink the ball to **verify** the course; any edit clears the verification.
+
+Publishing courses as community posts is next on the roadmap.
+
 ## Tech stack
 
 | Layer    | Tools                                               |
@@ -51,7 +69,7 @@ npm run dev     # playtest live on r/golferit_dev (rebuilds on save)
 Installing the app posts today's challenge automatically. After that a scheduled task posts a new one every day at 00:00 UTC. Moderators also get two subreddit menu items (**⋯ menu**):
 
 - **Post today's daily challenge**: creates it if the scheduled task hasn't yet (it never posts twice for one day).
-- **Create a practice post**: a free-play post on a random hole, with its own leaderboard and no streak.
+- **Create a practice post**: opens a form listing every hole. Pick one to create a free-play post for it (its own leaderboard, no streak). Handy for trying out any hole.
 
 ## Commands
 
@@ -75,11 +93,14 @@ src/
     constants/     Dimensions and rules
     course/        Geometry, game rules, moving-obstacle timing
     daily.ts       Daily rotation, post data, date helpers
+    editor/        Editor design model and design → course builder
     scoring.ts     Score packing (strokes + time) and time formatting
     api.ts         Request/response types
   client/          Runs in the iframe on reddit.com
     splash.tsx     Lightweight feed preview (no Three.js)
     game.tsx       Full-screen game entry
+    editor.tsx     Course editor entry (3D loads only for test play)
+    editor/        Editor screen, grid, tools, test play
     game/
       engine/      Renderer, camera, lighting, render loop, cleanup
       objects/     3D meshes built from course data
@@ -102,6 +123,8 @@ src/
 **Moving obstacles depend only on time.** The windmill's blade angle is `windmillBladeAngle(obstacle, t)` and a slider's position is `sliderOffset(obstacle, t)`. The visual mesh and its physics collider evaluate the same function, so they stay in sync.
 
 **Each post knows its hole.** When the app creates a post it attaches `postData` (`{ kind, courseId, date, number }`). Client and server both read it from Devvit's context, so the splash shows the challenge instantly and the server validates scores against the right course. Posts without `postData` (created before daily challenges) play Meadow Mill.
+
+**Editor designs build real courses.** A design is a tile string plus a list of items. `buildCourseFromDesign` traces the track's edges into the wall outline, turns water regions into ponds set slightly in from the walls, sizes each slider to its corridor, and adds scenery. It's pure and shared, so the client previews with it and the server can re-run it before anything is published.
 
 **The daily rotation is deterministic.** Challenge #1 was 2026-11-18, and each day takes the next hole in the catalog. The scheduler, the install trigger and the moderator menu all go through one function that creates at most one post per day.
 
@@ -129,6 +152,9 @@ Scores are stored in a Redis sorted set per post. The score packs strokes and ti
 | `GET /api/leaderboard`   | Top 10, your best and rank, player count                                 |
 | `POST /api/round/start`  | Begin an official, server-timed round                                    |
 | `POST /api/round/submit` | Validate and record a finished round                                     |
+| `GET /api/editor/draft`  | Your saved editor draft (logged in)                                      |
+| `POST /api/subscribe`    | Join the subreddit the app is installed in (as the user)                 |
+| `PUT /api/editor/draft`  | Save your editor draft (structure-checked)                               |
 
 ## Things to know
 
@@ -146,7 +172,8 @@ Scores are stored in a Redis sorted set per post. The score packs strokes and ti
 - [x] Timed, server-validated scores and leaderboards
 - [x] Daily challenge with streaks, button zoom
 - [x] Bridges, tunnels, sliding obstacles
-- [ ] Course editor and community-published courses
+- [x] Course editor (track, water, obstacles, test play, server drafts)
+- [ ] Publish community courses as posts, moderator featuring into dailies
 - [ ] Creator rankings
 - [ ] Ramps and elevation
 - [ ] Server-side replay validation

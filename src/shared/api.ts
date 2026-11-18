@@ -1,4 +1,5 @@
 import type { GolferitPostData } from './daily';
+import type { CourseDesign } from './editor/design';
 
 export type StreakInfo = {
   /** Consecutive UTC days with a completed daily challenge (0 if broken). */
@@ -17,9 +18,30 @@ export type InitResponse = {
   best: ScoreEntry | null;
   /** Null when logged out. */
   streak: StreakInfo | null;
+  /** Subreddit the app is installed in (where the Join button subscribes). */
+  subredditName: string;
+  /** True once the viewer has joined via the app's Join button. */
+  joined: boolean;
+  /** Viewer tapped Join and the post reloaded for consent: finish the join. */
+  pendingJoin: boolean;
 };
 
-export type ErrorCode = 'unauthenticated' | 'invalid' | 'not_found' | 'server';
+export type JoinIntentResponse = {
+  type: 'joinIntent';
+};
+
+export type SubscribeResponse = {
+  type: 'subscribed';
+  subredditName: string;
+};
+
+export type ErrorCode =
+  | 'unauthenticated'
+  /** Logged in, but Reddit refused an action taken as the user. */
+  | 'forbidden'
+  | 'invalid'
+  | 'not_found'
+  | 'server';
 
 export type ErrorResponse = {
   status: 'error';
@@ -78,4 +100,15 @@ export type SubmitRoundResponse = {
   streak: StreakInfo | null;
   /** True when this round counted toward the daily streak. */
   countedForStreak: boolean;
+};
+
+export type DraftResponse = {
+  type: 'draft';
+  /** Null when the user hasn't saved a draft yet. */
+  design: CourseDesign | null;
+};
+
+export type SaveDraftResponse = {
+  type: 'draftSaved';
+  savedAt: number;
 };

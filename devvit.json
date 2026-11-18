@@ -5,11 +5,13 @@
     "dir": "dist/client",
     "entrypoints": {
       "default": {
-        "inline": true,
         "entry": "splash.html"
       },
       "game": {
         "entry": "game.html"
+      },
+      "editor": {
+        "entry": "editor.html"
       }
     }
   },
@@ -28,12 +30,15 @@
       },
       {
         "label": "Create a practice post",
-        "description": "Create a Golferit practice post on a random hole",
+        "description": "Create a Golferit practice post on a hole you choose",
         "location": "subreddit",
         "forUserType": "moderator",
         "endpoint": "/internal/menu/post-create"
       }
     ]
+  },
+  "forms": {
+    "practiceCourse": "/internal/form/practice-course"
   },
   "triggers": {
     "onAppInstall": "/internal/triggers/on-app-install"

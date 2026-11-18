@@ -6,6 +6,7 @@ import { createRoot } from 'react-dom/client';
 import { formatDuration } from '../shared/scoring';
 import { courseForPost, parsePostData, postLabel } from '../shared/daily';
 import { usePlayer, type PlayerState } from './hooks/usePlayer';
+import { JoinButton } from './components/JoinButton';
 
 /** One line under the Play button: personal best / streak / nudge. */
 const PlayerLine = ({ player }: { player: PlayerState }) => {
@@ -68,6 +69,21 @@ export const Splash = () => {
         Play
       </button>
       <PlayerLine player={player} />
+      <button
+        type="button"
+        className="relative cursor-pointer rounded-full bg-white/85 px-4 py-1.5 text-sm font-bold text-sky-900 shadow transition hover:bg-white"
+        onClick={(e) => requestExpandedMode(e.nativeEvent, 'editor')}
+      >
+        🛠 Build your own course
+      </button>
+      {/* Logged-in viewers only: logged-out users can't subscribe. */}
+      {player.status === 'ready' && player.username && player.subredditName ? (
+        <JoinButton
+          subredditName={player.subredditName}
+          alreadyJoined={player.joined}
+          pendingJoin={player.pendingJoin}
+        />
+      ) : null}
     </main>
   );
 };

@@ -1,12 +1,13 @@
 import { Hono, type Context } from 'hono';
 import type { UiResponse } from '@devvit/web/shared';
 import { context } from '@devvit/web/server';
+import { COURSE_CATALOG } from '../../shared/courses';
 import { utcDateKey } from '../../shared/daily';
-import { createPracticePost, ensureDailyPost } from '../services/posts';
+import { ensureDailyPost } from '../services/posts';
 
 export const menu = new Hono();
 
-const goToPost = (c: Context, postId: string, toast?: string) =>
+export const goToPost = (c: Context, postId: string, toast?: string) =>
   c.json<UiResponse>(
     {
       navigateTo: `https://reddit.com/r/${context.subredditName}/comments/${postId}`,
@@ -33,12 +34,33 @@ menu.post('/daily-post', async (c) => {
   }
 });
 
+/** Opens a form listing every hole; the form handler creates the post. */
 menu.post('/post-create', async (c) => {
-  try {
-    const { postId } = await createPracticePost();
-    return goToPost(c, postId);
-  } catch (error) {
-    console.error(`Error creating post: ${error}`);
-    return c.json<UiResponse>({ showToast: 'Failed to create post' }, 400);
-  }
+  const first = COURSE_CATALOG[0];
+  return c.json<UiResponse>(
+    {
+      showForm: {
+        name: 'practiceCourse',
+        form: {
+          title: 'Create a practice post',
+          description: 'Pick the hole this post will play.',
+          acceptLabel: 'Create post',
+          fields: [
+            {
+              type: 'select',
+              name: 'courseId',
+              label: 'Hole',
+              required: true,
+              options: COURSE_CATALOG.map((course) => ({
+                label: `${course.name} (par ${course.par})`,
+                value: course.id,
+              })),
+              ...(first ? { defaultValue: [first.id] } : {}),
+            },
+          ],
+        },
+      },
+    },
+    200
+  );
 });
