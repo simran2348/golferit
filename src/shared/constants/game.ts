@@ -15,6 +15,12 @@ export const WALL_POST_SIZE = WALL_THICKNESS * 1.5;
 
 export const BUMPER_HEIGHT = 0.36;
 export const SLIDER_HEIGHT = 0.42;
+/** Spinner arm: a low bar the ball can't hop. */
+export const SPINNER_ARM_HEIGHT = 0.22;
+export const SPINNER_ARM_THICKNESS = 0.12;
+export const SPINNER_POST_RADIUS = 0.11;
+/** Free-standing partitions are a little thinner than the outer walls. */
+export const PARTITION_THICKNESS = 0.2;
 /** Tunnel side walls; the arched roof above is visual only (out of reach). */
 export const TUNNEL_WALL_HEIGHT = 0.5;
 

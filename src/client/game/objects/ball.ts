@@ -9,7 +9,7 @@ const TEE_MAT_HEIGHT = 0.008;
 
 export const createBall = (materials: Materials): Mesh => {
   const ball = new Mesh(
-    new SphereGeometry(BALL_RADIUS, 20, 14),
+    new SphereGeometry(BALL_RADIUS, 32, 24),
     materials.ball
   );
   ball.name = 'ball';

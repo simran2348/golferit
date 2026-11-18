@@ -22,7 +22,15 @@ export type TileKind = keyof typeof TILE_CHARS;
 /** Quarter turns clockwise when seen from above. */
 export type Rotation = 0 | 1 | 2 | 3;
 
-export type ItemKind = 'tee' | 'cup' | 'bumper' | 'windmill' | 'slider';
+export type ItemKind =
+  | 'tee'
+  | 'cup'
+  | 'bumper'
+  | 'windmill'
+  | 'slider'
+  | 'ramp'
+  | 'spinner'
+  | 'wall';
 
 export type EditorItem = {
   kind: ItemKind;
@@ -40,8 +48,21 @@ export type CourseDesign = {
   items: EditorItem[];
 };
 
-/** Items with an orientation; the rest ignore `rotation`. */
-export const ROTATABLE: ReadonlySet<ItemKind> = new Set(['windmill', 'slider']);
+/**
+ * How many distinct orientations each item has; tapping a placed item cycles
+ * through them. 1 = no orientation. For the spinner the two states are spin
+ * directions (clockwise / counter-clockwise); for the wall, `\` and `/`.
+ */
+export const ORIENTATIONS: Readonly<Record<ItemKind, number>> = {
+  tee: 1,
+  cup: 1,
+  bumper: 1,
+  windmill: 4,
+  slider: 2,
+  ramp: 2,
+  spinner: 2,
+  wall: 2,
+};
 /** Exactly one of each is required. */
 export const UNIQUE_ITEMS: ReadonlySet<ItemKind> = new Set(['tee', 'cup']);
 
@@ -97,13 +118,7 @@ export const createStarterDesign = (): CourseDesign => {
   return design;
 };
 
-const ITEM_KINDS: ReadonlySet<string> = new Set([
-  'tee',
-  'cup',
-  'bumper',
-  'windmill',
-  'slider',
-]);
+const ITEM_KINDS: ReadonlySet<string> = new Set(Object.keys(ORIENTATIONS));
 const TILES_PATTERN = new RegExp(
   `^[${TILE_CHARS.empty}${TILE_CHARS.track}${TILE_CHARS.water}]{${GRID_COLS * GRID_ROWS}}$`
 );

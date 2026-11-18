@@ -8,9 +8,13 @@ import {
 import { Euler, Quaternion, Vector3 } from 'three';
 import type {
   CourseDefinition,
+  Obstacle,
+  RampObstacle,
   SliderObstacle,
+  SpinnerObstacle,
   TunnelObstacle,
   Vec2,
+  WallObstacle,
   WindmillObstacle,
 } from '../../../shared/types/course';
 import {
@@ -19,14 +23,21 @@ import {
   polygonBounds,
 } from '../../../shared/course/geometry';
 import {
+  rampProfile,
   sliderOffset,
+  spinnerAngle,
+  surfaceHeightAt,
   windmillBladeAngle,
 } from '../../../shared/course/obstacles';
 import {
   BALL_RADIUS,
   BUMPER_HEIGHT,
+  PARTITION_THICKNESS,
   PHYSICS_STEP,
   SLIDER_HEIGHT,
+  SPINNER_ARM_HEIGHT,
+  SPINNER_ARM_THICKNESS,
+  SPINNER_POST_RADIUS,
   TUNNEL_WALL_HEIGHT,
   WALL_BASE_Y,
   WALL_POST_SIZE,
@@ -58,6 +69,14 @@ type Slider = {
   axisZ: number;
 };
 
+type Spinner = {
+  definition: SpinnerObstacle;
+  body: RigidBody;
+};
+
+/** Spinner arms float just above the ground so they never scrape it. */
+const SPINNER_ARM_LIFT = 0.02;
+
 const scratchQuat = new Quaternion();
 const scratchEuler = new Euler();
 
@@ -72,11 +91,14 @@ export class PhysicsWorld {
   private readonly ballBody: RigidBody;
   private readonly windmills: Windmill[] = [];
   private readonly sliders: Slider[] = [];
+  private readonly spinners: Spinner[] = [];
+  private readonly obstacles: Obstacle[];
   /** Simulation clock, seconds. Starts at the engine's clock to stay in sync. */
   time: number;
 
   constructor(course: CourseDefinition, startTime: number) {
     this.time = startTime;
+    this.obstacles = course.obstacles;
     this.world = new World({ x: 0, y: -9.81, z: 0 });
     this.world.timestep = PHYSICS_STEP;
 
@@ -124,12 +146,22 @@ export class PhysicsWorld {
         z: slider.definition.position.z + slider.axisZ * offset,
       });
     }
+    for (const spinner of this.spinners) {
+      spinner.body.setNextKinematicRotation(
+        yawQuaternion(spinnerAngle(spinner.definition, this.time))
+      );
+    }
     this.world.step();
   }
 
   getBallPosition(target: Vector3): Vector3 {
     const t = this.ballBody.translation();
     return target.set(t.x, t.y, t.z);
+  }
+
+  getBallRotation(target: Quaternion): Quaternion {
+    const r = this.ballBody.rotation();
+    return target.set(r.x, r.y, r.z, r.w);
   }
 
   getBallVelocity(target: Vector3): Vector3 {
@@ -156,10 +188,17 @@ export class PhysicsWorld {
     this.ballBody.setEnabled(enabled);
   }
 
+  /** Put the ball at rest on the surface (the ground or a ramp top). */
   placeBall(position: Vec2): void {
     this.stopBall();
+    const ground = surfaceHeightAt(this.obstacles, position);
     this.ballBody.setTranslation(
-      { x: position.x, y: BALL_RADIUS + 0.005, z: position.z },
+      // A little extra on slopes, where the contact point isn't straight down.
+      {
+        x: position.x,
+        y: BALL_RADIUS + 0.005 + ground + (ground > 0 ? 0.02 : 0),
+        z: position.z,
+      },
       true
     );
     this.ballBody.setEnabled(true);
@@ -246,6 +285,15 @@ export class PhysicsWorld {
           break;
         case 'tunnel':
           this.createTunnel(obstacle, body);
+          break;
+        case 'ramp':
+          this.createRamp(obstacle, body);
+          break;
+        case 'spinner':
+          this.createSpinner(obstacle);
+          break;
+        case 'wall':
+          this.createPartition(obstacle, body);
           break;
       }
     }
@@ -367,6 +415,74 @@ export class PhysicsWorld {
         statics
       );
     }
+  }
+
+  /** One convex hull (no seams for the ball to catch on), grassy friction. */
+  private createRamp(ramp: RampObstacle, statics: RigidBody): void {
+    const points: number[] = [];
+    for (const [along, height] of rampProfile(ramp)) {
+      for (const side of [-1, 1]) {
+        points.push(along, height, (side * ramp.width) / 2);
+      }
+    }
+    const hull = ColliderDesc.convexHull(new Float32Array(points));
+    if (!hull) throw new Error(`Ramp ${ramp.id} has a degenerate shape`);
+    this.world.createCollider(
+      hull
+        .setTranslation(ramp.position.x, 0, ramp.position.z)
+        .setRotation(yawQuaternion(ramp.rotationY))
+        .setFriction(0.8)
+        .setRestitution(0)
+        .setRestitutionCombineRule(CoefficientCombineRule.Min),
+      statics
+    );
+  }
+
+  /** Kinematic body spun about its post, posed from `spinnerAngle`. */
+  private createSpinner(spinner: SpinnerObstacle): void {
+    const body = this.world.createRigidBody(
+      RigidBodyDesc.kinematicPositionBased()
+        .setTranslation(spinner.position.x, 0, spinner.position.z)
+        .setRotation(yawQuaternion(spinnerAngle(spinner, this.time)))
+    );
+    const halfArm = SPINNER_ARM_HEIGHT / 2;
+    this.world.createCollider(
+      this.bouncy(
+        ColliderDesc.cuboid(
+          spinner.armLength,
+          halfArm,
+          SPINNER_ARM_THICKNESS / 2
+        )
+      ).setTranslation(0, SPINNER_ARM_LIFT + halfArm, 0),
+      body
+    );
+    this.world.createCollider(
+      this.bouncy(
+        ColliderDesc.cylinder(COLLIDER_WALL_HEIGHT / 2, SPINNER_POST_RADIUS)
+      ).setTranslation(0, COLLIDER_WALL_HEIGHT / 2, 0),
+      body
+    );
+    this.spinners.push({ definition: spinner, body });
+  }
+
+  private createPartition(wall: WallObstacle, statics: RigidBody): void {
+    const dx = wall.to.x - wall.from.x;
+    const dz = wall.to.z - wall.from.z;
+    const length = Math.hypot(dx, dz);
+    if (length === 0) return;
+    const halfHeight = (COLLIDER_WALL_HEIGHT - WALL_BASE_Y) / 2;
+    this.world.createCollider(
+      this.bouncy(
+        ColliderDesc.cuboid(length / 2, halfHeight, PARTITION_THICKNESS / 2)
+      )
+        .setTranslation(
+          (wall.from.x + wall.to.x) / 2,
+          WALL_BASE_Y + halfHeight,
+          (wall.from.z + wall.to.z) / 2
+        )
+        .setRotation(yawQuaternion(Math.atan2(-dz, dx))),
+      statics
+    );
   }
 
   private bouncy(desc: ColliderDesc): ColliderDesc {

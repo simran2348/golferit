@@ -2,24 +2,38 @@ import {
   BoxGeometry,
   ConeGeometry,
   CylinderGeometry,
+  ExtrudeGeometry,
   Group,
   Mesh,
+  Shape,
+  SphereGeometry,
 } from 'three';
 import type {
   BumperObstacle,
   Obstacle,
+  RampObstacle,
   SliderObstacle,
+  SpinnerObstacle,
   TunnelObstacle,
+  WallObstacle,
   WindmillObstacle,
 } from '../../../shared/types/course';
 import {
+  rampProfile,
   sliderOffset,
+  spinnerAngle,
   windmillBladeAngle,
 } from '../../../shared/course/obstacles';
 import {
   BUMPER_HEIGHT,
+  PARTITION_THICKNESS,
   SLIDER_HEIGHT,
+  SPINNER_ARM_HEIGHT,
+  SPINNER_ARM_THICKNESS,
+  SPINNER_POST_RADIUS,
   TUNNEL_WALL_HEIGHT,
+  WALL_BASE_Y,
+  WALL_HEIGHT,
   WINDMILL,
 } from '../../../shared/constants/game';
 import type { Updatable } from '../engine/types';
@@ -256,6 +270,133 @@ const createTunnel = (tunnel: TunnelObstacle, materials: Materials): Group => {
   return group;
 };
 
+/** Turf hump with wooden side cheeks; same profile as the physics hull. */
+const createRamp = (ramp: RampObstacle, materials: Materials): Group => {
+  const group = new Group();
+  group.name = ramp.id;
+  group.position.set(ramp.position.x, 0, ramp.position.z);
+  group.rotation.y = ramp.rotationY;
+
+  const profile = rampProfile(ramp);
+  const shape = new Shape();
+  profile.forEach(([along, height], i) => {
+    if (i === 0) shape.moveTo(along, height);
+    else shape.lineTo(along, height);
+  });
+  shape.closePath();
+  const geometry = new ExtrudeGeometry(shape, {
+    depth: ramp.width,
+    bevelEnabled: false,
+  });
+  geometry.translate(0, 0, -ramp.width / 2);
+  // Group 0 = the two end caps (wooden cheeks), group 1 = slopes and top.
+  const mesh = shadowed(
+    new Mesh(geometry, [materials.wood, materials.rampTurf])
+  );
+  // Sit a hair above the fairway so the base edge doesn't flicker.
+  mesh.position.y = 0.002;
+
+  // White lips where the slopes meet the top: reads clearly from above.
+  const lipGeometry = new BoxGeometry(0.05, 0.012, ramp.width * 0.98);
+  for (const side of [-1, 1]) {
+    const lip = new Mesh(lipGeometry, materials.white);
+    lip.position.set((side * ramp.topLength) / 2, ramp.height + 0.006, 0);
+    group.add(lip);
+  }
+  group.add(mesh);
+  return group;
+};
+
+/** Striped bar on a post, spinning flat on the ground. */
+const createSpinner = (
+  spinner: SpinnerObstacle,
+  materials: Materials
+): { group: Group; updatable: Updatable } => {
+  const group = new Group();
+  group.name = spinner.id;
+  group.position.set(spinner.position.x, 0, spinner.position.z);
+
+  const rotor = new Group();
+  const armLength = spinner.armLength * 2;
+  const arm = shadowed(
+    new Mesh(
+      new BoxGeometry(armLength, SPINNER_ARM_HEIGHT, SPINNER_ARM_THICKNESS),
+      materials.bumper
+    )
+  );
+  arm.position.y = 0.02 + SPINNER_ARM_HEIGHT / 2;
+  // White bands near the tips make the rotation easy to read.
+  const bandGeometry = new BoxGeometry(
+    0.1,
+    SPINNER_ARM_HEIGHT + 0.01,
+    SPINNER_ARM_THICKNESS + 0.01
+  );
+  for (const side of [-1, 1]) {
+    const band = new Mesh(bandGeometry, materials.white);
+    band.position.set(side * (spinner.armLength - 0.12), arm.position.y, 0);
+    rotor.add(band);
+  }
+  const post = shadowed(
+    new Mesh(
+      new CylinderGeometry(
+        SPINNER_POST_RADIUS,
+        SPINNER_POST_RADIUS * 1.2,
+        0.42,
+        10
+      ),
+      materials.woodDark
+    )
+  );
+  post.position.y = 0.21;
+  const knob = shadowed(
+    new Mesh(
+      new SphereGeometry(SPINNER_POST_RADIUS * 1.15, 10, 8),
+      materials.white
+    )
+  );
+  knob.position.y = 0.44;
+  rotor.add(arm, post, knob);
+  group.add(rotor);
+
+  return {
+    group,
+    updatable: {
+      update: (elapsed) => {
+        rotor.rotation.y = spinnerAngle(spinner, elapsed);
+      },
+    },
+  };
+};
+
+/** Wooden partition matching the outer walls, with a post at each end. */
+const createPartition = (wall: WallObstacle, materials: Materials): Group => {
+  const group = new Group();
+  group.name = wall.id;
+  const dx = wall.to.x - wall.from.x;
+  const dz = wall.to.z - wall.from.z;
+  const length = Math.hypot(dx, dz);
+  const height = WALL_HEIGHT - WALL_BASE_Y;
+  group.position.set(
+    (wall.from.x + wall.to.x) / 2,
+    0,
+    (wall.from.z + wall.to.z) / 2
+  );
+  group.rotation.y = Math.atan2(-dz, dx);
+
+  const board = shadowed(
+    new Mesh(
+      new BoxGeometry(length, height, PARTITION_THICKNESS),
+      materials.wood
+    )
+  );
+  board.position.y = WALL_BASE_Y + height / 2;
+  const capGeometry = new BoxGeometry(length, 0.04, PARTITION_THICKNESS + 0.04);
+  const cap = shadowed(new Mesh(capGeometry, materials.woodDark));
+  cap.position.y = WALL_HEIGHT + 0.02;
+  group.add(board, cap);
+  return group;
+};
+
 export const createObstacles = (
   obstacles: Obstacle[],
   materials: Materials
@@ -283,6 +424,18 @@ export const createObstacles = (
       }
       case 'tunnel':
         group.add(createTunnel(obstacle, materials));
+        break;
+      case 'ramp':
+        group.add(createRamp(obstacle, materials));
+        break;
+      case 'spinner': {
+        const spinner = createSpinner(obstacle, materials);
+        group.add(spinner.group);
+        updatables.push(spinner.updatable);
+        break;
+      }
+      case 'wall':
+        group.add(createPartition(obstacle, materials));
         break;
     }
   }

@@ -33,6 +33,10 @@ const NAME_PATTERN = /^[\p{L}\p{N} '’&!?.,:-]+$/u;
 const WATER_INSET = 0.1;
 const SLIDER_LENGTH = 0.9;
 const SLIDER_WIDTH = 0.45;
+const RAMP_HEIGHT = 0.15;
+const RAMP_TOP_LENGTH = 0.25;
+const SPINNER_ARM = 0.62;
+const SPINNER_SPEED = 1.4;
 
 const isPlayable = (kind: TileKind) => kind !== 'empty';
 
@@ -300,6 +304,40 @@ export const buildCourseFromDesign = (
           phase: (item.col * 3 + item.row * 7) % 6,
           length: SLIDER_LENGTH,
           width: SLIDER_WIDTH,
+        });
+        break;
+      }
+      case 'ramp':
+        obstacles.push({
+          kind: 'ramp',
+          id: `ramp-${i}`,
+          position: center,
+          rotationY: item.rotation % 2 === 0 ? 0 : -Math.PI / 2,
+          length: TILE_SIZE,
+          width: TILE_SIZE,
+          height: RAMP_HEIGHT,
+          topLength: RAMP_TOP_LENGTH,
+        });
+        break;
+      case 'spinner':
+        obstacles.push({
+          kind: 'spinner',
+          id: `spinner-${i}`,
+          position: center,
+          armLength: SPINNER_ARM,
+          // Rotation 0 spins clockwise seen from above (negative yaw rate).
+          speed: item.rotation % 2 === 0 ? -SPINNER_SPEED : SPINNER_SPEED,
+          phase: ((item.col * 5 + item.row * 3) % 7) * 0.45,
+        });
+        break;
+      case 'wall': {
+        // Corner to corner across the tile: rotation 0 is `\`, 1 is `/`.
+        const slash = item.rotation % 2 === 1;
+        obstacles.push({
+          kind: 'wall',
+          id: `wall-${i}`,
+          from: corner({ x: item.col, z: slash ? item.row + 1 : item.row }),
+          to: corner({ x: item.col + 1, z: slash ? item.row : item.row + 1 }),
         });
         break;
       }

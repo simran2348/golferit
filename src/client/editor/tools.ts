@@ -1,6 +1,6 @@
 import {
   MAX_ITEMS,
-  ROTATABLE,
+  ORIENTATIONS,
   UNIQUE_ITEMS,
   inGrid,
   tileAt,
@@ -20,7 +20,8 @@ export type ToolInfo = {
   drag: boolean;
 };
 
-export const TOOLS: readonly ToolInfo[] = [
+/** Left rail: shaping the course. */
+export const EDIT_TOOLS: readonly ToolInfo[] = [
   {
     id: 'track',
     label: 'Track',
@@ -46,7 +47,29 @@ export const TOOLS: readonly ToolInfo[] = [
     drag: false,
   },
   { id: 'cup', label: 'Cup', hint: 'The hole. Tap to move it.', drag: false },
+];
+
+/** Right rail: obstacles. Tap a placed one again to turn it. */
+export const OBSTACLE_TOOLS: readonly ToolInfo[] = [
   { id: 'bumper', label: 'Bumper', hint: 'A bouncy post.', drag: false },
+  {
+    id: 'wall',
+    label: 'Angle',
+    hint: 'Diagonal wall to bank shots. Tap again to flip it.',
+    drag: false,
+  },
+  {
+    id: 'ramp',
+    label: 'Ramp',
+    hint: 'A hump to putt over. Too soft and it rolls back. Tap to turn.',
+    drag: false,
+  },
+  {
+    id: 'spinner',
+    label: 'Spinner',
+    hint: 'A bar spinning on the ground. Tap again to reverse it.',
+    drag: false,
+  },
   {
     id: 'windmill',
     label: 'Windmill',
@@ -61,10 +84,10 @@ export const TOOLS: readonly ToolInfo[] = [
   },
 ];
 
+export const TOOLS: readonly ToolInfo[] = [...EDIT_TOOLS, ...OBSTACLE_TOOLS];
+
 const nextRotation = (kind: ItemKind, rotation: Rotation): Rotation => {
-  // Sliders only have two meaningful orientations.
-  const turns = kind === 'slider' ? 2 : 4;
-  const next = (rotation + 1) % turns;
+  const next = (rotation + 1) % ORIENTATIONS[kind];
   return next === 1 ? 1 : next === 2 ? 2 : next === 3 ? 3 : 0;
 };
 
@@ -96,7 +119,7 @@ export const applyTool = (
     default: {
       if (!strokeStart) return design;
       if (itemHere?.kind === tool) {
-        if (!ROTATABLE.has(tool)) return design;
+        if (ORIENTATIONS[tool] < 2) return design;
         return {
           ...design,
           items: design.items.map((i) =>

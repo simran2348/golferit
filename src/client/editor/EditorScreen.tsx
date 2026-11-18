@@ -9,12 +9,23 @@ import { buildCourseFromDesign } from '../../shared/editor/buildCourse';
 import type { CourseDefinition } from '../../shared/types/course';
 import { DesignGrid } from './DesignGrid';
 import { ItemGlyph } from './ItemGlyph';
-import { TOOLS, type Tool } from './tools';
+import {
+  EDIT_TOOLS,
+  OBSTACLE_TOOLS,
+  TOOLS,
+  type Tool,
+  type ToolInfo,
+} from './tools';
 import { useEditorDraft, type SaveStatus } from './useEditorDraft';
 
 // The 3D engine and physics load only when you press Test play.
 const TestPlay = lazy(() =>
   import('./TestPlay').then((m) => ({ default: m.TestPlay }))
+);
+
+// Full-screen 3D view; shares the Three.js chunk with TestPlay.
+const CoursePreview = lazy(() =>
+  import('./CoursePreview').then((m) => ({ default: m.CoursePreview }))
 );
 
 const SAVE_LABEL: Record<SaveStatus, string> = {
@@ -51,12 +62,50 @@ const ToolIcon = ({ tool }: { tool: Tool }) => {
   );
 };
 
+type ToolRailProps = {
+  label: string;
+  tools: readonly ToolInfo[];
+  active: Tool;
+  onSelect: (tool: Tool) => void;
+};
+
+/** Vertical tool column; scrolls if the screen is very short. */
+const ToolRail = ({ label, tools, active, onSelect }: ToolRailProps) => (
+  <nav
+    aria-label={label}
+    className="flex w-[3.75rem] shrink-0 flex-col gap-1 overflow-y-auto rounded-2xl bg-white/90 p-1 shadow-lg sm:w-[4.5rem]"
+  >
+    <p className="pt-0.5 text-center text-[8px] font-bold tracking-normal text-slate-400 uppercase sm:text-[9px] sm:tracking-wider">
+      {label}
+    </p>
+    {tools.map((t) => (
+      <button
+        key={t.id}
+        type="button"
+        onClick={() => onSelect(t.id)}
+        aria-pressed={active === t.id}
+        className={`flex flex-col items-center gap-0.5 rounded-xl px-0.5 py-1.5 text-[10px] font-bold transition sm:text-[11px] ${
+          active === t.id
+            ? 'bg-orange-500 text-white shadow'
+            : 'text-slate-600 hover:bg-slate-100'
+        }`}
+      >
+        <ToolIcon tool={t.id} />
+        {t.label}
+      </button>
+    ))}
+  </nav>
+);
+
 export const EditorScreen = () => {
   const draft = useEditorDraft();
   const { design } = draft;
   const [tool, setTool] = useState<Tool>('track');
   const [testCourse, setTestCourse] = useState<CourseDefinition | null>(null);
   const [verifiedKey, setVerifiedKey] = useState<string | null>(null);
+  const [previewCourse, setPreviewCourse] = useState<CourseDefinition | null>(
+    null
+  );
 
   const build = useMemo(() => buildCourseFromDesign(design, 'draft'), [design]);
   const verified = verifiedKey === designKey(design);
@@ -120,43 +169,47 @@ export const EditorScreen = () => {
         >
           ↶
         </button>
+        <button
+          type="button"
+          disabled={!build.ok}
+          onClick={() => {
+            if (build.ok) setPreviewCourse(build.course);
+          }}
+          aria-label="View course in 3D"
+          title={build.ok ? 'View in 3D' : 'Fix the course to view it in 3D'}
+          className="h-10 rounded-xl bg-sky-900 px-3 text-sm font-black text-white shadow transition hover:bg-sky-800 disabled:bg-white/70 disabled:text-slate-400"
+        >
+          3D
+        </button>
       </header>
 
-      {/* Grid */}
-      <div className="flex min-h-0 flex-1 items-center justify-center px-3">
-        <div className="aspect-[10/14] h-full max-h-full max-w-full">
+      {/* Edit rail · grid · obstacle rail */}
+      <div className="flex min-h-0 flex-1 gap-2 px-2">
+        <ToolRail
+          label="Edit"
+          tools={EDIT_TOOLS}
+          active={tool}
+          onSelect={setTool}
+        />
+        <div className="min-h-0 min-w-0 flex-1">
           <DesignGrid
             design={design}
             onStrokeStart={draft.strokeStart}
+            onStrokeCancel={draft.cancelStroke}
             onPaint={paint}
           />
         </div>
+        <ToolRail
+          label="Obstacles"
+          tools={OBSTACLE_TOOLS}
+          active={tool}
+          onSelect={setTool}
+        />
       </div>
-
-      {/* Tools */}
-      <div className="px-3 pt-3">
-        <div className="grid grid-cols-4 gap-1 rounded-2xl bg-white/90 p-1.5 shadow-lg sm:grid-cols-8">
-          {TOOLS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => setTool(t.id)}
-              aria-pressed={tool === t.id}
-              className={`flex flex-col items-center gap-0.5 rounded-xl px-1 py-1 text-[11px] font-bold transition ${
-                tool === t.id
-                  ? 'bg-orange-500 text-white'
-                  : 'text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              <ToolIcon tool={t.id} />
-              {t.label}
-            </button>
-          ))}
-        </div>
-        <p className="mt-1.5 text-center text-xs font-medium text-sky-950/80">
-          {toolInfo?.hint}
-        </p>
-      </div>
+      <p className="px-3 pt-1.5 text-center text-xs font-medium text-sky-950/80">
+        <span className="font-bold">{toolInfo?.label}:</span> {toolInfo?.hint}
+        <span className="hidden sm:inline"> · Scroll or pinch to zoom</span>
+      </p>
 
       {/* Status + test */}
       <footer className="flex items-center gap-2 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
@@ -186,6 +239,22 @@ export const EditorScreen = () => {
           ▶ Test
         </button>
       </footer>
+
+      {/* Full-screen 3D: covers the editor, which stays mounted underneath. */}
+      {previewCourse ? (
+        <Suspense
+          fallback={
+            <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#2fa6d9] font-bold text-white">
+              Loading 3D…
+            </div>
+          }
+        >
+          <CoursePreview
+            course={previewCourse}
+            onBack={() => setPreviewCourse(null)}
+          />
+        </Suspense>
+      ) : null}
 
       {testCourse ? (
         <Suspense

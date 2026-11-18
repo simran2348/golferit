@@ -21,7 +21,7 @@ import { createRandom } from './random';
 
 const FAIRWAY_THICKNESS = 0.06;
 const ISLAND_THICKNESS = 0.9;
-const WATER_LEVEL = -0.14;
+export const WATER_LEVEL = -0.14;
 
 /*
  * Shapes are drawn in 2D (x, y) then rotated flat. Rotating -90° about X maps

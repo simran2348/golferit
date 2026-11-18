@@ -6,6 +6,7 @@ import { GameplaySystem } from '../logic/GameplaySystem';
 import { createAimIndicator, type AimIndicator } from '../objects/aimIndicator';
 import { createCourseScene } from '../objects/course';
 import { createMaterials } from '../objects/materials';
+import { createSplash, type SplashEffect } from '../objects/splash';
 import { loadPhysics } from '../physics/loadPhysics';
 import type { PhysicsWorld } from '../physics/PhysicsWorld';
 import { CameraRig } from './camera';
@@ -41,6 +42,7 @@ export class GameEngine {
   private readonly resizeObserver: ResizeObserver;
   private readonly ball: Mesh;
   private readonly aimIndicator: AimIndicator;
+  private readonly splash: SplashEffect;
   private gameplay: Gameplay | null = null;
   private aim: Aim | null = null;
   private elapsed = 0;
@@ -60,7 +62,12 @@ export class GameEngine {
     const environment = createEnvironment(this.scene);
     this.ball = course3d.ball;
     this.framingPoints = course3d.framingPoints;
-    this.updatables = [...course3d.updatables, environment.updatable];
+    this.splash = createSplash();
+    this.updatables = [
+      ...course3d.updatables,
+      environment.updatable,
+      this.splash.updatable,
+    ];
     this.aimIndicator = createAimIndicator();
 
     const shadowBounds = course3d.shadowBounds.clone();
@@ -70,6 +77,7 @@ export class GameEngine {
       course3d.root,
       environment.ocean,
       this.aimIndicator.group,
+      this.splash.group,
       createLighting(shadowBounds, isCoarsePointer() ? 1024 : 2048)
     );
 
@@ -126,7 +134,8 @@ export class GameEngine {
       this.course,
       physics,
       this.session,
-      this.ball
+      this.ball,
+      { splash: (position) => this.splash.trigger(position) }
     );
     const controls = new ShotControls({
       element: this.renderer.domElement,

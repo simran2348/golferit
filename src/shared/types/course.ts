@@ -74,8 +74,52 @@ export type TunnelObstacle = {
   outerWidth: number;
 };
 
+/**
+ * A hump the ball has to roll up and over: slope, flat top, slope. Local
+ * frame: the ball travels along X; `width` spans Z. Too soft a putt rolls
+ * back down.
+ */
+export type RampObstacle = {
+  kind: 'ramp';
+  id: string;
+  position: Vec2;
+  rotationY: number;
+  /** Footprint along the travel axis, base to base. */
+  length: number;
+  width: number;
+  height: number;
+  /** Length of the flat top. */
+  topLength: number;
+};
+
+/** Two-armed bar spinning flat on the ground around a centre post. */
+export type SpinnerObstacle = {
+  kind: 'spinner';
+  id: string;
+  position: Vec2;
+  /** Centre to arm tip. */
+  armLength: number;
+  /** Radians per second; positive is counter-clockwise seen from above. */
+  speed: number;
+  phase: number;
+};
+
+/** Free-standing straight wall (e.g. a diagonal deflector) between two points. */
+export type WallObstacle = {
+  kind: 'wall';
+  id: string;
+  from: Vec2;
+  to: Vec2;
+};
+
 export type Obstacle =
-  WindmillObstacle | BumperObstacle | SliderObstacle | TunnelObstacle;
+  | WindmillObstacle
+  | BumperObstacle
+  | SliderObstacle
+  | TunnelObstacle
+  | RampObstacle
+  | SpinnerObstacle
+  | WallObstacle;
 
 /** Wooden plank across water. On the plank you're safe; off it, splash. */
 export type Bridge = {

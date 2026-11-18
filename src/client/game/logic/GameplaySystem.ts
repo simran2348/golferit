@@ -32,6 +32,11 @@ const DISTURBED_SPEED = 0.3;
 const SINK_DURATION = { cup: 0.35, water: 0.5 } as const;
 const WATER_SINK_Y = -0.45;
 
+export type GameplayEffects = {
+  /** The ball just hit the water at this point. */
+  splash?: (position: Vector3) => void;
+};
+
 type Sink = {
   kind: 'cup' | 'water';
   from: Vector3;
@@ -58,7 +63,8 @@ export class GameplaySystem {
     private readonly course: CourseDefinition,
     private readonly physics: PhysicsWorld,
     private readonly session: GameSession,
-    private readonly ballMesh: Object3D
+    private readonly ballMesh: Object3D,
+    private readonly effects: GameplayEffects = {}
   ) {
     this.lastRestPosition = { ...course.tee };
     this.unsubscribeRestart = session.onEvent((event) => {
@@ -108,6 +114,8 @@ export class GameplaySystem {
       this.updateSink(delta);
     } else {
       this.physics.getBallPosition(this.ballMesh.position);
+      // The physics ball really rolls (friction spins it), so show that.
+      this.physics.getBallRotation(this.ballMesh.quaternion);
     }
   }
 
@@ -169,6 +177,7 @@ export class GameplaySystem {
           )
         : new Vector3(position.x, WATER_SINK_Y, position.z);
     this.sink = { kind, from: position.clone(), to, progress: 0 };
+    if (kind === 'water') this.effects.splash?.(position);
   }
 
   private updateSink(delta: number): void {

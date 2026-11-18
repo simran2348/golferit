@@ -6,6 +6,7 @@ import {
   RepeatWrapping,
   SRGBColorSpace,
 } from 'three';
+import { createBallColorTexture, createDimpleTexture } from './ballTextures';
 
 export const PALETTE = {
   fairwayLight: '#7ed957',
@@ -29,6 +30,8 @@ export const PALETTE = {
   rock: '#a7a9ac',
   stone: '#c9c2b4',
   plank: '#b07a45',
+  rampTurf: '#5cc23f',
+  splash: '#eaf8ff',
 } as const;
 
 /** Mown-stripe grass texture generated at runtime: no image download needed. */
@@ -76,7 +79,15 @@ export const createMaterials = () => ({
     side: DoubleSide,
     flatShading: true,
   }),
-  ball: new MeshStandardMaterial({ color: PALETTE.white, roughness: 0.35 }),
+  // Dimpled, slightly glossy cover with an alignment line.
+  ball: new MeshStandardMaterial({
+    map: createBallColorTexture(),
+    bumpMap: createDimpleTexture(),
+    bumpScale: 1.5,
+    roughness: 0.32,
+    metalness: 0,
+  }),
+  rampTurf: flat(PALETTE.rampTurf),
   windmillBody: flat(PALETTE.windmillBody),
   windmillRoof: flat(PALETTE.windmillRoof),
   windmillBlade: flat(PALETTE.windmillBlade),

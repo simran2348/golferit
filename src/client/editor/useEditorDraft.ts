@@ -18,6 +18,7 @@ type State = { design: CourseDesign; past: CourseDesign[]; revision: number };
 type Action =
   | { type: 'load'; design: CourseDesign }
   | { type: 'strokeStart' }
+  | { type: 'cancelStroke' }
   | {
       type: 'paint';
       tool: Tool;
@@ -39,6 +40,15 @@ const reducer = (state: State, action: Action): State => {
         ...state,
         past: [...state.past, state.design].slice(-HISTORY_LIMIT),
       };
+    case 'cancelStroke': {
+      // A one-finger stroke turned into a pinch: drop what it painted.
+      const past = [...state.past];
+      const before = past.pop();
+      if (!before) return state;
+      return before === state.design
+        ? { ...state, past }
+        : { design: before, past, revision: state.revision + 1 };
+    }
     case 'paint': {
       const next = applyTool(
         state.design,
@@ -133,6 +143,7 @@ export const useEditorDraft = () => {
     canUndo: state.past.some((d) => d !== design),
     saveStatus,
     strokeStart: useCallback(() => dispatch({ type: 'strokeStart' }), []),
+    cancelStroke: useCallback(() => dispatch({ type: 'cancelStroke' }), []),
     paint: useCallback(
       (tool: Tool, col: number, row: number, strokeStart: boolean) =>
         dispatch({ type: 'paint', tool, col, row, strokeStart }),
