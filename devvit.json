@@ -23,7 +23,7 @@
     "items": [
       {
         "label": "Post today's daily challenge",
-        "description": "Create today's Golferit daily challenge (if not already posted)",
+        "description": "Post today's Golferit daily challenge. The first time, this also starts automatic daily posts",
         "location": "subreddit",
         "forUserType": "moderator",
         "endpoint": "/internal/menu/daily-post"

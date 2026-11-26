@@ -26,7 +26,7 @@ Every day a new **Daily Challenge** post appears with one of the built-in holes.
 
 - Ten built-in holes, easiest first: **Bumper Lane**, **Sandy Shore**, **Plank Crossing**, **Speedway**, **Ramp Rally**, **Tunnel Run**, **Spin Cycle**, **Warp Garden**, **Windmill Way**, **Grand Tour**. Each is drawn as an editor design, so a player could build every one of them.
 - Three.js low-poly look: floating islands, wooden walls, water, soft shadows, a fixed isometric camera with button zoom
-- Automatic daily challenge post at 00:00 UTC, rotating through the holes, plus daily streaks
+- Daily challenge post at 00:00 UTC once a moderator starts it, rotating through the holes, plus daily streaks
 - Rapier physics with a fixed 120 Hz step (the same result on every device's frame rate)
 - Works with mouse and touch; responsive from 360 px phones to desktop
 - Server-timed and server-validated scores, personal bests, and a leaderboard per post (Devvit Redis)
@@ -78,10 +78,10 @@ npm run login   # once: authorise the Devvit CLI
 npm run dev     # playtest live on r/golferit_dev (rebuilds on save)
 ```
 
-Installing the app posts today's challenge automatically. After that a scheduled task posts a new one every day at 00:00 UTC. Moderators also get these subreddit menu items (**⋯ menu**):
+Installing the app posts nothing. Daily challenges start when a moderator uses **Post today's daily challenge** for the first time (or **Resume daily challenges**). From then on a scheduled task posts a new one every day at 00:00 UTC. Moderators also get these subreddit menu items (**⋯ menu**):
 
-- **Post today's daily challenge**: creates it if the scheduled task hasn't yet (it never posts twice for one day).
-- **Pause daily challenges** / **Resume daily challenges**: stop or restart the automatic daily post (and the post on install). While paused, **Post today's daily challenge** still works for a one-off. Numbering carries on where it stopped: pause after #3 and the next daily is #4.
+- **Post today's daily challenge**: the first time, posts daily #1 and starts the daily schedule. After that it's a fallback if the scheduled task hasn't run yet (it never posts twice for one day).
+- **Pause daily challenges** / **Resume daily challenges**: stop or restart the automatic daily post. Resume also starts the schedule if nobody has yet (first post at the next 00:00 UTC). While paused, **Post today's daily challenge** still works for a one-off. Numbering carries on where it stopped: pause after #3 and the next daily is #4.
 - **Create a practice post**: opens a form listing every hole. Pick one to create a free-play post for it (its own leaderboard, no streak). Handy for trying out any hole.
 
 ## Commands

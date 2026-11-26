@@ -26,6 +26,33 @@ const DAILY_PAUSED_KEY = 'dailyPaused';
 export const isDailyPaused = async (): Promise<boolean> =>
   (await redis.get(DAILY_PAUSED_KEY)) !== undefined;
 
+/** Set once a moderator has started daily challenges in this subreddit. */
+const DAILY_STARTED_KEY = 'dailyStarted';
+
+/**
+ * Automatic daily posts begin only after a moderator posts the first daily
+ * (or presses Resume): installing the app posts nothing. Subreddits from
+ * before this setting, which already have a recent daily, count as started.
+ */
+export const isDailyStarted = async (dateKey: string): Promise<boolean> => {
+  if ((await redis.get(DAILY_STARTED_KEY)) !== undefined) return true;
+  const recent = await Promise.all([
+    redis.get(LAST_DAILY_KEY),
+    redis.get(dailyKey(dateKey)),
+    redis.get(dailyKey(previousDateKey(dateKey))),
+  ]);
+  if (recent.every((value) => value === undefined)) return false;
+  await redis.set(DAILY_STARTED_KEY, new Date().toISOString());
+  return true;
+};
+
+/** Returns true if this call started them (false if already started). */
+export const startDailyPosts = async (dateKey: string): Promise<boolean> => {
+  if (await isDailyStarted(dateKey)) return false;
+  await redis.set(DAILY_STARTED_KEY, new Date().toISOString());
+  return true;
+};
+
 /** Returns false if it was already in that state. */
 export const setDailyPaused = async (paused: boolean): Promise<boolean> => {
   if ((await isDailyPaused()) === paused) return false;

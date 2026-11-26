@@ -3,7 +3,12 @@ import type { UiResponse } from '@devvit/web/shared';
 import { context } from '@devvit/web/server';
 import { COURSE_CATALOG } from '../../shared/courses';
 import { utcDateKey } from '../../shared/daily';
-import { ensureDailyPost, setDailyPaused } from '../services/posts';
+import {
+  ensureDailyPost,
+  isDailyPaused,
+  setDailyPaused,
+  startDailyPosts,
+} from '../services/posts';
 
 export const menu = new Hono();
 
@@ -16,15 +21,30 @@ export const goToPost = (c: Context, postId: string, toast?: string) =>
     200
   );
 
-/** Moderator fallback if the scheduled task hasn't run yet today. */
+/**
+ * Posts today's challenge. The first use also starts daily challenges in
+ * this subreddit (installing the app posts nothing). Afterwards it's a
+ * fallback if the scheduled task hasn't run, or a one-off while paused.
+ */
 menu.post('/daily-post', async (c) => {
   try {
-    const { postId, created } = await ensureDailyPost(utcDateKey(new Date()));
-    return goToPost(
-      c,
-      postId,
-      created ? undefined : "Today's challenge already exists"
-    );
+    const today = utcDateKey(new Date());
+    // Before posting: the "started" check also looks at today's daily.
+    const firstStart = await startDailyPosts(today);
+    const [{ postId, created }, paused] = await Promise.all([
+      ensureDailyPost(today),
+      isDailyPaused(),
+    ]);
+    const toast = firstStart
+      ? paused
+        ? 'Posted. Automatic daily posts are paused; Resume to turn them on.'
+        : 'Daily challenges started! A new one posts every day at 00:00 UTC.'
+      : !created
+        ? "Today's challenge already exists"
+        : paused
+          ? 'Posted. Automatic daily posts are still paused.'
+          : undefined;
+    return goToPost(c, postId, toast);
   } catch (error) {
     console.error(`Error creating daily post: ${error}`);
     return c.json<UiResponse>(
@@ -52,14 +72,18 @@ menu.post('/daily-pause', async (c) => {
   }
 });
 
+/** Also starts daily challenges if they never were (no post until 00:00). */
 menu.post('/daily-resume', async (c) => {
   try {
-    const changed = await setDailyPaused(false);
+    const unpaused = await setDailyPaused(false);
+    const started = await startDailyPosts(utcDateKey(new Date()));
     return c.json<UiResponse>(
       {
-        showToast: changed
-          ? 'Daily challenges resumed. Next post at 00:00 UTC.'
-          : 'Daily challenges are already running.',
+        showToast: started
+          ? 'Daily challenges started. First post at 00:00 UTC.'
+          : unpaused
+            ? 'Daily challenges resumed. Next post at 00:00 UTC.'
+            : 'Daily challenges are already running.',
       },
       200
     );
