@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from 'react';
 import {
   createStarterDesign,
   parseDesign,
@@ -9,6 +16,7 @@ import { applyTool, type Tool } from './tools';
 
 const HISTORY_LIMIT = 50;
 const AUTOSAVE_DELAY_MS = 1000;
+const STARTER_JSON = JSON.stringify(createStarterDesign());
 
 export type SaveStatus =
   'loading' | 'idle' | 'saving' | 'saved' | 'unauthenticated' | 'error';
@@ -28,7 +36,8 @@ type Action =
     }
   | { type: 'setName'; name: string }
   | { type: 'setPar'; par: number }
-  | { type: 'undo' };
+  | { type: 'undo' }
+  | { type: 'reset' };
 
 const reducer = (state: State, action: Action): State => {
   switch (action.type) {
@@ -73,6 +82,13 @@ const reducer = (state: State, action: Action): State => {
         design: { ...state.design, par: action.par },
         revision: state.revision + 1,
       };
+    case 'reset':
+      // Back to the starter course; undoable like any other edit.
+      return {
+        design: createStarterDesign(),
+        past: [...state.past, state.design].slice(-HISTORY_LIMIT),
+        revision: state.revision + 1,
+      };
     case 'undo': {
       // Skip snapshots identical to the current design (no-op strokes).
       const past = [...state.past];
@@ -89,6 +105,9 @@ const reducer = (state: State, action: Action): State => {
  * Editor state: the design, undo history and server autosave. Drafts live in
  * Redis (not localStorage), so they survive app updates and follow the user
  * across devices.
+ *
+ * The editor always opens on a fresh starter course. The last saved draft is
+ * offered via `resumeDraft` until the first edit, which autosaves over it.
  */
 export const useEditorDraft = () => {
   const [state, dispatch] = useReducer(reducer, {
@@ -97,6 +116,7 @@ export const useEditorDraft = () => {
     revision: 0,
   });
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('loading');
+  const [savedDraft, setSavedDraft] = useState<CourseDesign | null>(null);
   const canSave = useRef(true);
 
   useEffect(() => {
@@ -104,8 +124,8 @@ export const useEditorDraft = () => {
     fetchDraft()
       .then(({ design }) => {
         if (cancelled) return;
-        const parsed = design ? parseDesign(design) : null;
-        if (parsed) dispatch({ type: 'load', design: parsed });
+        // Don't open it: keep it on offer so the user can choose.
+        setSavedDraft(design ? parseDesign(design) : null);
         setSaveStatus('idle');
       })
       .catch((error: unknown) => {
@@ -138,8 +158,24 @@ export const useEditorDraft = () => {
     return () => window.clearTimeout(timer);
   }, [design, revision]);
 
+  const isStarter = useMemo(
+    () => JSON.stringify(design) === STARTER_JSON,
+    [design]
+  );
+
+  const resumeDraft = useCallback(() => {
+    if (!savedDraft) return;
+    dispatch({ type: 'load', design: savedDraft });
+    setSavedDraft(null);
+    // It's exactly what the server holds.
+    setSaveStatus('saved');
+  }, [savedDraft]);
+
   return {
     design,
+    /** Saved draft can still be opened (nothing edited yet). */
+    canResume: savedDraft !== null && revision === 0,
+    resumeDraft,
     canUndo: state.past.some((d) => d !== design),
     saveStatus,
     strokeStart: useCallback(() => dispatch({ type: 'strokeStart' }), []),
@@ -155,5 +191,8 @@ export const useEditorDraft = () => {
     ),
     setPar: useCallback((par: number) => dispatch({ type: 'setPar', par }), []),
     undo: useCallback(() => dispatch({ type: 'undo' }), []),
+    /** Nothing to reset when the design already is the starter course. */
+    canReset: !isStarter,
+    reset: useCallback(() => dispatch({ type: 'reset' }), []),
   };
 };

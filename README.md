@@ -79,9 +79,35 @@ Installing the app posts today's challenge automatically. After that a scheduled
 | `npm run build`      | Build client and server into `dist/`        |
 | `npm run test:types` | TypeScript type check                       |
 | `npm run lint`       | ESLint                                      |
+| `npm run test`       | Unit tests (same as `test:unit`)            |
 | `npm run test:unit`  | Unit tests (`src/**/*.test.ts`)             |
 | `npm run deploy`     | Type check, lint, then upload a new version |
 | `npm run launch`     | Deploy and publish for review               |
+
+## Testing
+
+```bash
+npm run test                                     # all unit tests
+npm run test -- --test-name-pattern=parseDesign  # only matching tests
+```
+
+Tests use Node's built-in runner (`node:test` + `node:assert/strict`). No extra dependencies. Test files sit next to the code as `*.test.ts`. Node runs the TypeScript directly.
+
+Source files import without extensions (`./geometry`). `tools/test-resolve.mjs` is a resolve hook that retries those with `.ts`, then `/index.ts`. Test files import with explicit `.ts` and are type-checked by `tools/tsconfig.test.json`.
+
+| Module                               | What's covered                                                    |
+| ------------------------------------ | ----------------------------------------------------------------- |
+| `shared/scoring.ts`                  | Score packing round-trip, strokes beat time, time clamp, duration |
+| `shared/daily.ts`                    | UTC date keys, challenge numbers, course rotation, post data      |
+| `shared/course/rules.ts`             | Cup capture, bridges, water, out of bounds, stroke limit, labels  |
+| `shared/course/geometry.ts`          | Point in polygon, area, bounds, offsets, wall segments            |
+| `shared/course/obstacles.ts`         | Windmill/slider/spinner timing and range, ramp height             |
+| `shared/editor/design.ts`            | Grid helpers, immutability, starter design, `parseDesign` rejects |
+| `shared/editor/buildCourse.ts`       | Starter builds; each invalid design gives its own error           |
+| `server/services/roundValidation.ts` | Request parsing, round plausibility checks                        |
+| `shared/courses`                     | Unique ids, tee and cup on dry fairway, par in range              |
+
+Only pure logic is unit tested. Rendering (Three.js), physics (Rapier), Redis and Devvit APIs are checked by playtesting with `npm run dev`.
 
 ## Project structure
 

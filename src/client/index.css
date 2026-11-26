@@ -23,6 +23,33 @@
   }
 }
 
+/*
+ * Expanded views (game, editor) opt in with <html class="phone-frame">. On
+ * wide screens (desktop web) they show as a centred phone-sized frame instead
+ * of stretching edge to edge. Phones are unaffected. Every overlay is
+ * absolutely positioned inside the app and the 3D canvases size to their
+ * container, so clipping #root is enough.
+ */
+@media (min-width: 640px) {
+  html.phone-frame body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at 50% 35%, #1e6f97, #0b2f45);
+  }
+
+  html.phone-frame #root {
+    position: relative;
+    width: min(430px, 100%);
+    height: min(932px, 100% - 32px);
+    overflow: hidden;
+    /* Ocean colour inside the frame: no dark flash before the first frame. */
+    background-color: #2fa6d9;
+    border-radius: 28px;
+    box-shadow: 0 24px 60px rgb(0 0 0 / 0.45);
+  }
+}
+
 @theme {
   --animate-notice: notice 2.2s ease-out forwards;
   --animate-notice-in: notice-in 0.25s ease-out;

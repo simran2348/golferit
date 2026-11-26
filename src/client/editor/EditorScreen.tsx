@@ -1,3 +1,4 @@
+import { showToast } from '@devvit/web/client';
 import { lazy, Suspense, useCallback, useMemo, useState } from 'react';
 import {
   MAX_PAR,
@@ -30,7 +31,7 @@ const CoursePreview = lazy(() =>
 
 const SAVE_LABEL: Record<SaveStatus, string> = {
   loading: 'Loading draft…',
-  idle: 'Draft',
+  idle: 'New course',
   saving: 'Saving…',
   saved: 'Saved ✓',
   unauthenticated: 'Log in to save',
@@ -214,12 +215,35 @@ export const EditorScreen = () => {
       {/* Status + test */}
       <footer className="flex items-center gap-2 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <div className="min-w-0 flex-1 rounded-xl bg-white/90 px-3 py-2 text-xs shadow">
-          <p className="font-bold text-slate-500">
-            {SAVE_LABEL[draft.saveStatus]}
-            {verified ? (
-              <span className="ml-2 text-emerald-600">· Verified ✓</span>
+          <div className="flex items-start justify-between gap-2 font-bold text-slate-500">
+            <p className="min-w-0">
+              {SAVE_LABEL[draft.saveStatus]}
+              {draft.canResume ? (
+                <button
+                  type="button"
+                  onClick={draft.resumeDraft}
+                  className="ml-2 font-bold text-sky-700 underline underline-offset-2 hover:text-sky-900"
+                >
+                  Resume last draft
+                </button>
+              ) : null}
+              {verified ? (
+                <span className="ml-2 text-emerald-600">· Verified ✓</span>
+              ) : null}
+            </p>
+            {draft.canReset ? (
+              <button
+                type="button"
+                onClick={() => {
+                  draft.reset();
+                  showToast('Started over. Tap ↶ to undo.');
+                }}
+                className="shrink-0 font-bold text-red-600 underline underline-offset-2 hover:text-red-700"
+              >
+                Start over
+              </button>
             ) : null}
-          </p>
+          </div>
           <p
             className={`truncate font-semibold ${build.ok ? 'text-emerald-700' : 'text-red-600'}`}
           >

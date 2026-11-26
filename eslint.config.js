@@ -78,4 +78,30 @@ export default defineConfig([
     plugins: { js },
     extends: ['js/recommended'],
   },
+  {
+    // Last so it overrides the general rules above. Unit tests: own tsconfig (Node types, '.ts' imports). node:test's
+    // test()/describe() return promises the runner tracks itself.
+    files: ['src/**/*.test.ts'],
+    languageOptions: {
+      globals: globals.node,
+      parserOptions: {
+        project: ['./tools/tsconfig.test.json'],
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: {
+      '@typescript-eslint/no-floating-promises': [
+        'error',
+        {
+          allowForKnownSafeCalls: [
+            {
+              from: 'package',
+              package: 'node:test',
+              name: ['test', 'it', 'describe', 'suite'],
+            },
+          ],
+        },
+      ],
+    },
+  },
 ]);

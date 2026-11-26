@@ -10,6 +10,7 @@ import {
   GRID_ROWS,
   tileAt,
   type CourseDesign,
+  type TileKind,
 } from '../../shared/editor/design';
 import { ItemGlyph } from './ItemGlyph';
 
@@ -17,6 +18,12 @@ import { ItemGlyph } from './ItemGlyph';
 const MAX_CELL_STRETCH = 2;
 const MAX_ZOOM = 4;
 const BUTTON_ZOOM_STEP = 1.4;
+/** Grid lines: a darker shade of each tile colour so every cell reads. */
+const TILE_LINES: Readonly<Record<TileKind, string>> = {
+  empty: '#bfdcc8',
+  track: '#55b43e',
+  water: '#2394cc',
+};
 const TILE_COLORS = {
   empty: '#d9efe0',
   track: '#74d35a',
@@ -344,8 +351,8 @@ export const DesignGrid = ({
           width={cw}
           height={ch}
           fill={TILE_COLORS[kind]}
-          stroke={kind === 'empty' ? '#bfdcc8' : 'none'}
-          strokeWidth={0.3 * unit}
+          stroke={TILE_LINES[kind]}
+          strokeWidth={(kind === 'empty' ? 0.3 : 0.45) * unit}
         />
       );
       if (kind === 'empty') continue;
