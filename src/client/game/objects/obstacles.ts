@@ -1,15 +1,22 @@
 import {
   BoxGeometry,
+  Color,
   ConeGeometry,
   CylinderGeometry,
   ExtrudeGeometry,
   Group,
   Mesh,
+  MeshBasicMaterial,
   Shape,
+  ShapeGeometry,
   SphereGeometry,
+  TorusGeometry,
 } from 'three';
 import type {
+  BoostObstacle,
   BumperObstacle,
+  PortalObstacle,
+  SandObstacle,
   Obstacle,
   RampObstacle,
   SliderObstacle,
@@ -37,7 +44,7 @@ import {
   WINDMILL,
 } from '../../../shared/constants/game';
 import type { Updatable } from '../engine/types';
-import type { Materials } from './materials';
+import { PALETTE, type Materials } from './materials';
 
 const shadowed = (mesh: Mesh): Mesh => {
   mesh.castShadow = true;
@@ -397,6 +404,154 @@ const createPartition = (wall: WallObstacle, materials: Materials): Group => {
   return group;
 };
 
+/** Rounded square in the XZ plane (ShapeGeometry is XY, so lay it flat). */
+const roundedSquare = (size: number, radius: number): ShapeGeometry => {
+  const h = size / 2;
+  const r = Math.min(radius, h);
+  const shape = new Shape();
+  shape.moveTo(-h + r, -h);
+  shape.lineTo(h - r, -h);
+  shape.quadraticCurveTo(h, -h, h, -h + r);
+  shape.lineTo(h, h - r);
+  shape.quadraticCurveTo(h, h, h - r, h);
+  shape.lineTo(-h + r, h);
+  shape.quadraticCurveTo(-h, h, -h, h - r);
+  shape.lineTo(-h, -h + r);
+  shape.quadraticCurveTo(-h, -h, -h + r, -h);
+  const geometry = new ShapeGeometry(shape, 6);
+  geometry.rotateX(-Math.PI / 2);
+  return geometry;
+};
+
+/** Flat bunker with a darker lip; ripples of raked sand on top. */
+const createSand = (sand: SandObstacle, materials: Materials): Group => {
+  const group = new Group();
+  group.name = sand.id;
+  group.position.set(sand.position.x, 0, sand.position.z);
+  const rim = new Mesh(roundedSquare(sand.size, 0.4), materials.sandRim);
+  rim.position.y = 0.004;
+  const bed = new Mesh(roundedSquare(sand.size - 0.12, 0.34), materials.sand);
+  bed.position.y = 0.007;
+  rim.receiveShadow = true;
+  bed.receiveShadow = true;
+  group.add(rim, bed);
+  // Rake lines.
+  const rakeGeometry = new BoxGeometry(sand.size * 0.6, 0.004, 0.025);
+  for (const z of [-0.3, -0.1, 0.1, 0.3]) {
+    const line = new Mesh(rakeGeometry, materials.sandRim);
+    line.position.set(0, 0.009, z * sand.size * 0.9);
+    group.add(line);
+  }
+  return group;
+};
+
+/** Dark pad with three chevrons that light up in sequence along the arrow. */
+const createBoost = (
+  boost: BoostObstacle,
+  materials: Materials
+): { group: Group; updatable: Updatable } => {
+  const group = new Group();
+  group.name = boost.id;
+  group.position.set(boost.position.x, 0, boost.position.z);
+  group.rotation.y = boost.rotationY;
+  const pad = new Mesh(roundedSquare(boost.size, 0.15), materials.boostPad);
+  pad.position.y = 0.006;
+  pad.receiveShadow = true;
+  group.add(pad);
+
+  // Chevron pointing +X, drawn in XY then laid flat.
+  const s = boost.size;
+  const chevron = new Shape();
+  chevron.moveTo(-0.12 * s, -0.26 * s);
+  chevron.lineTo(0.02 * s, -0.26 * s);
+  chevron.lineTo(0.14 * s, 0);
+  chevron.lineTo(0.02 * s, 0.26 * s);
+  chevron.lineTo(-0.12 * s, 0.26 * s);
+  chevron.lineTo(0, 0);
+  chevron.closePath();
+  const chevronGeometry = new ShapeGeometry(chevron);
+  chevronGeometry.rotateX(-Math.PI / 2);
+  const dim = new Color(PALETTE.boostPad).lerp(
+    new Color(PALETTE.boostArrow),
+    0.35
+  );
+  const bright = new Color(PALETTE.boostArrow);
+  const arrows = [-0.27, 0, 0.27].map((x) => {
+    const material = new MeshBasicMaterial({ color: dim.clone() });
+    const mesh = new Mesh(chevronGeometry, material);
+    mesh.position.set(x * s, 0.01, 0);
+    group.add(mesh);
+    return material;
+  });
+
+  return {
+    group,
+    updatable: {
+      update: (elapsed) => {
+        arrows.forEach((material, i) => {
+          const wave = (Math.sin(elapsed * 7 - i * 1.4) + 1) / 2;
+          material.color.copy(dim).lerp(bright, wave * wave);
+        });
+      },
+    },
+  };
+};
+
+/** One glowing ring with a dark core and orbiting sparks, at each end. */
+const createPortal = (
+  portal: PortalObstacle,
+  materials: Materials
+): { group: Group; updatable: Updatable } => {
+  const group = new Group();
+  group.name = portal.id;
+  const ringGeometry = new TorusGeometry(portal.radius + 0.04, 0.05, 6, 24);
+  ringGeometry.rotateX(Math.PI / 2);
+  const coreGeometry = new CylinderGeometry(
+    portal.radius,
+    portal.radius,
+    0.01,
+    24
+  );
+  const sparkGeometry = new SphereGeometry(0.035, 6, 4);
+  const sparkMaterial = new MeshBasicMaterial({ color: PALETTE.portalGlow });
+  const swirls: Group[] = [];
+
+  for (const end of [portal.a, portal.b]) {
+    const hole = new Group();
+    hole.position.set(end.x, 0, end.z);
+    const ring = shadowed(new Mesh(ringGeometry, materials.portalRing));
+    ring.position.y = 0.04;
+    const core = new Mesh(coreGeometry, materials.portalCore);
+    core.position.y = 0.006;
+    const swirl = new Group();
+    for (let i = 0; i < 3; i++) {
+      const spark = new Mesh(sparkGeometry, sparkMaterial);
+      const angle = (i * Math.PI * 2) / 3;
+      spark.position.set(
+        Math.cos(angle) * portal.radius * 0.6,
+        0.04,
+        Math.sin(angle) * portal.radius * 0.6
+      );
+      swirl.add(spark);
+    }
+    hole.add(ring, core, swirl);
+    group.add(hole);
+    swirls.push(swirl);
+  }
+
+  return {
+    group,
+    updatable: {
+      update: (elapsed) => {
+        for (const swirl of swirls) {
+          swirl.rotation.y = elapsed * 3;
+          swirl.position.y = Math.sin(elapsed * 4) * 0.015;
+        }
+      },
+    },
+  };
+};
+
 export const createObstacles = (
   obstacles: Obstacle[],
   materials: Materials
@@ -437,6 +592,21 @@ export const createObstacles = (
       case 'wall':
         group.add(createPartition(obstacle, materials));
         break;
+      case 'sand':
+        group.add(createSand(obstacle, materials));
+        break;
+      case 'boost': {
+        const boost = createBoost(obstacle, materials);
+        group.add(boost.group);
+        updatables.push(boost.updatable);
+        break;
+      }
+      case 'portal': {
+        const portal = createPortal(obstacle, materials);
+        group.add(portal.group);
+        updatables.push(portal.updatable);
+        break;
+      }
     }
   }
 

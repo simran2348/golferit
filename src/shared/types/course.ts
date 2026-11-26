@@ -112,6 +112,42 @@ export type WallObstacle = {
   to: Vec2;
 };
 
+/** Square bunker (rounded corners). Heavy drag: the ball bogs down in it. */
+export type SandObstacle = {
+  kind: 'sand';
+  id: string;
+  position: Vec2;
+  /** Side length of the square. */
+  size: number;
+};
+
+/**
+ * Arrow pad. Each time the ball rolls onto it, it gets a push along the
+ * arrow, to at least `speed` (see `boostVelocity`). Local frame: the arrow
+ * points along +X.
+ */
+export type BoostObstacle = {
+  kind: 'boost';
+  id: string;
+  position: Vec2;
+  rotationY: number;
+  /** Side length of the square pad. */
+  size: number;
+  speed: number;
+};
+
+/**
+ * Two linked holes. Rolling into either one pops the ball out of the other,
+ * keeping its velocity. The exit is ignored until the ball has left it.
+ */
+export type PortalObstacle = {
+  kind: 'portal';
+  id: string;
+  a: Vec2;
+  b: Vec2;
+  radius: number;
+};
+
 export type Obstacle =
   | WindmillObstacle
   | BumperObstacle
@@ -119,7 +155,10 @@ export type Obstacle =
   | TunnelObstacle
   | RampObstacle
   | SpinnerObstacle
-  | WallObstacle;
+  | WallObstacle
+  | SandObstacle
+  | BoostObstacle
+  | PortalObstacle;
 
 /** Wooden plank across water. On the plank you're safe; off it, splash. */
 export type Bridge = {

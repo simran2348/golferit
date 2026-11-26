@@ -3,7 +3,12 @@ import { describe, test } from 'node:test';
 import { isPointInPolygon } from '../course/geometry.ts';
 import { isBallInWater } from '../course/rules.ts';
 import { MAX_PAR, MIN_PAR } from '../editor/design.ts';
-import { COURSE_CATALOG, DEFAULT_COURSE, getCourseById } from './index.ts';
+import {
+  COURSE_CATALOG,
+  DEFAULT_COURSE,
+  RETIRED_COURSES,
+  getCourseById,
+} from './index.ts';
 
 describe('course catalog', () => {
   test('has unique ids that getCourseById finds', () => {
@@ -15,11 +20,24 @@ describe('course catalog', () => {
     assert.equal(getCourseById('no-such-course'), undefined);
   });
 
-  test('includes the default course', () => {
-    assert.ok(COURSE_CATALOG.includes(DEFAULT_COURSE));
+  test('has ten holes in rotation', () => {
+    assert.equal(COURSE_CATALOG.length, 10);
   });
 
-  for (const course of COURSE_CATALOG) {
+  test('retired holes stay playable by id but are out of rotation', () => {
+    for (const course of RETIRED_COURSES) {
+      assert.equal(getCourseById(course.id), course);
+      assert.equal(COURSE_CATALOG.includes(course), false);
+    }
+    const ids = [...COURSE_CATALOG, ...RETIRED_COURSES].map((c) => c.id);
+    assert.equal(new Set(ids).size, ids.length);
+  });
+
+  test('the default course resolves by id', () => {
+    assert.equal(getCourseById(DEFAULT_COURSE.id), DEFAULT_COURSE);
+  });
+
+  for (const course of [...COURSE_CATALOG, ...RETIRED_COURSES]) {
     describe(course.name, () => {
       test('tee and cup are on the course and not in water', () => {
         for (const point of [course.tee, course.cup]) {

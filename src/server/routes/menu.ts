@@ -3,7 +3,7 @@ import type { UiResponse } from '@devvit/web/shared';
 import { context } from '@devvit/web/server';
 import { COURSE_CATALOG } from '../../shared/courses';
 import { utcDateKey } from '../../shared/daily';
-import { ensureDailyPost } from '../services/posts';
+import { ensureDailyPost, setDailyPaused } from '../services/posts';
 
 export const menu = new Hono();
 
@@ -31,6 +31,41 @@ menu.post('/daily-post', async (c) => {
       { showToast: 'Failed to create daily challenge' },
       400
     );
+  }
+});
+
+/** Stop the 00:00 UTC daily post until resumed. Manual posting still works. */
+menu.post('/daily-pause', async (c) => {
+  try {
+    const changed = await setDailyPaused(true);
+    return c.json<UiResponse>(
+      {
+        showToast: changed
+          ? 'Daily challenges paused. No new posts until you resume.'
+          : 'Daily challenges are already paused.',
+      },
+      200
+    );
+  } catch (error) {
+    console.error(`Error pausing daily posts: ${error}`);
+    return c.json<UiResponse>({ showToast: 'Failed to pause' }, 400);
+  }
+});
+
+menu.post('/daily-resume', async (c) => {
+  try {
+    const changed = await setDailyPaused(false);
+    return c.json<UiResponse>(
+      {
+        showToast: changed
+          ? 'Daily challenges resumed. Next post at 00:00 UTC.'
+          : 'Daily challenges are already running.',
+      },
+      200
+    );
+  } catch (error) {
+    console.error(`Error resuming daily posts: ${error}`);
+    return c.json<UiResponse>({ showToast: 'Failed to resume' }, 400);
   }
 });
 

@@ -1,4 +1,4 @@
-import type { CourseDefinition } from '../types/course';
+import type { CourseDefinition } from '../../types/course';
 
 /**
  * Hand-authored starter hole. An L-shaped fairway: tee on the west end, through

@@ -1,6 +1,8 @@
 import {
   MAX_ITEMS,
   ORIENTATIONS,
+  PORTAL_COUNT,
+  itemTile,
   UNIQUE_ITEMS,
   inGrid,
   tileAt,
@@ -35,6 +37,18 @@ export const EDIT_TOOLS: readonly ToolInfo[] = [
     drag: true,
   },
   {
+    id: 'bridge',
+    label: 'Bridge',
+    hint: 'Planks across water. Tap again to turn it.',
+    drag: false,
+  },
+  {
+    id: 'sand',
+    label: 'Sand',
+    hint: 'A bunker. The ball slows right down in it.',
+    drag: false,
+  },
+  {
     id: 'erase',
     label: 'Erase',
     hint: 'Removes an item, then the tile.',
@@ -62,6 +76,24 @@ export const OBSTACLE_TOOLS: readonly ToolInfo[] = [
     id: 'ramp',
     label: 'Ramp',
     hint: 'A hump to putt over. Too soft and it rolls back. Tap to turn.',
+    drag: false,
+  },
+  {
+    id: 'tunnel',
+    label: 'Tunnel',
+    hint: 'A covered passage. Only the middle is open. Tap to turn.',
+    drag: false,
+  },
+  {
+    id: 'boost',
+    label: 'Boost',
+    hint: 'Speeds the ball up along the arrow. Tap to turn it.',
+    drag: false,
+  },
+  {
+    id: 'portal',
+    label: 'Teleport',
+    hint: 'Place two. In one, out the other.',
     drag: false,
   },
   {
@@ -104,11 +136,10 @@ export const applyTool = (
 
   switch (tool) {
     case 'track':
-      return withTile(design, col, row, 'track');
     case 'water': {
-      // Items can't sit on water, so painting water clears them.
-      const next = withTile(design, col, row, 'water');
-      return itemHere
+      // Only bridges sit on water; repainting clears items that no longer fit.
+      const next = withTile(design, col, row, tool);
+      return itemHere && itemTile(itemHere.kind) !== tool
         ? { ...next, items: design.items.filter((i) => i !== itemHere) }
         : next;
     }
@@ -131,13 +162,20 @@ export const applyTool = (
       }
       let items = design.items.filter((i) => i !== itemHere);
       if (UNIQUE_ITEMS.has(tool)) items = items.filter((i) => i.kind !== tool);
+      if (
+        tool === 'portal' &&
+        items.filter((i) => i.kind === 'portal').length >= PORTAL_COUNT
+      ) {
+        return design;
+      }
       if (items.length >= MAX_ITEMS) return design;
       items = [...items, { kind: tool, col, row, rotation: 0 }];
-      // Placing an item lays track under it.
+      // Placing an item lays the tile it needs (track, or water for bridges).
+      const tile = itemTile(tool);
       const base =
-        tileAt(design, col, row) === 'track'
+        tileAt(design, col, row) === tile
           ? design
-          : withTile(design, col, row, 'track');
+          : withTile(design, col, row, tile);
       return { ...base, items };
     }
   }

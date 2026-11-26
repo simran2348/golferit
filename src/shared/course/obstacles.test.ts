@@ -1,12 +1,23 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import type {
+  BoostObstacle,
+  PortalObstacle,
   RampObstacle,
+  SandObstacle,
   SliderObstacle,
   SpinnerObstacle,
   WindmillObstacle,
 } from '../types/course.ts';
 import {
+  BOOST_EXTRA_SPEED,
+  BOOST_MAX_SPEED,
+  boostDirection,
+  boostVelocity,
+  boostsAt,
+  isInSand,
+  otherPortalEnd,
+  portalEndAt,
   rampHeightAt,
   sliderOffset,
   spinnerAngle,
@@ -142,5 +153,85 @@ describe('surfaceHeightAt', () => {
 
   test('is the ramp height on a ramp', () => {
     assert.equal(surfaceHeightAt([spinner, ramp], { x: 0, z: 0 }), ramp.height);
+  });
+});
+
+describe('sand', () => {
+  const obstacles: SandObstacle[] = [
+    { kind: 'sand', id: 's', position: { x: 2, z: 0 }, size: 1 },
+  ];
+
+  test('covers its square and nothing else', () => {
+    assert.equal(isInSand(obstacles, { x: 2, z: 0 }), true);
+    assert.equal(isInSand(obstacles, { x: 2.49, z: -0.49 }), true);
+    assert.equal(isInSand(obstacles, { x: 2.6, z: 0 }), false);
+    assert.equal(isInSand([], { x: 2, z: 0 }), false);
+  });
+});
+
+describe('boost pads', () => {
+  const pad: BoostObstacle = {
+    kind: 'boost',
+    id: 'b',
+    position: { x: 0, z: 0 },
+    rotationY: 0,
+    size: 1,
+    speed: 9,
+  };
+  const speedAlong = (v: { x: number; z: number }) => v.x;
+
+  test('point along local +X, turned by rotationY', () => {
+    assert.deepEqual(boostDirection(pad), { x: 1, z: -0 });
+    const down = boostDirection({ ...pad, rotationY: -Math.PI / 2 });
+    assert.ok(Math.abs(down.x) < 1e-9 && Math.abs(down.z - 1) < 1e-9);
+  });
+
+  test('find the pads under a point', () => {
+    assert.deepEqual(boostsAt([pad], { x: 0.4, z: 0.4 }), [pad]);
+    assert.deepEqual(boostsAt([pad], { x: 0.6, z: 0 }), []);
+  });
+
+  test('bring a slow ball up to the pad speed', () => {
+    assert.equal(speedAlong(boostVelocity(pad, { x: 1, z: 0 })), 9);
+    // Even one rolling the wrong way.
+    assert.equal(speedAlong(boostVelocity(pad, { x: -2, z: 0 })), 9);
+  });
+
+  test('push a fast ball a little more, up to the cap', () => {
+    assert.equal(
+      speedAlong(boostVelocity(pad, { x: 10, z: 0 })),
+      10 + BOOST_EXTRA_SPEED
+    );
+    assert.equal(
+      speedAlong(boostVelocity(pad, { x: BOOST_MAX_SPEED - 1, z: 0 })),
+      BOOST_MAX_SPEED
+    );
+    // Never slows a ball that is already faster than the cap.
+    assert.equal(speedAlong(boostVelocity(pad, { x: 20, z: 0 })), 20);
+  });
+
+  test('halve sideways drift', () => {
+    assert.equal(boostVelocity(pad, { x: 5, z: 2 }).z, 1);
+  });
+});
+
+describe('teleporters', () => {
+  const portal: PortalObstacle = {
+    kind: 'portal',
+    id: 'p',
+    a: { x: 0, z: 0 },
+    b: { x: 5, z: 5 },
+    radius: 0.3,
+  };
+
+  test('report which end a point is in', () => {
+    assert.equal(portalEndAt(portal, { x: 0.2, z: 0 }), 'a');
+    assert.equal(portalEndAt(portal, { x: 5, z: 4.8 }), 'b');
+    assert.equal(portalEndAt(portal, { x: 1, z: 1 }), null);
+  });
+
+  test('lead to the other end', () => {
+    assert.equal(otherPortalEnd('a'), 'b');
+    assert.equal(otherPortalEnd('b'), 'a');
   });
 });

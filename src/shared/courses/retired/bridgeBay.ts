@@ -1,4 +1,4 @@
-import type { CourseDefinition } from '../types/course';
+import type { CourseDefinition } from '../../types/course';
 
 /**
  * A long lane split by a pond. The only dry crossing is a narrow plank set

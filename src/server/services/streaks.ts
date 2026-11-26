@@ -1,6 +1,7 @@
 import { redis } from '@devvit/web/server';
 import type { StreakInfo } from '../../shared/api';
-import { previousDateKey } from '../../shared/daily';
+import { extendsStreak, isStreakAlive } from '../../shared/daily';
+import { getDailyHistory } from './posts';
 
 /** Hash per user: current, best, lastDate (UTC date of last daily completion). */
 const streakKey = (userId: string) => `streak:${userId}`;
@@ -16,10 +17,17 @@ const load = async (userId: string): Promise<StoredStreak> => {
   };
 };
 
-const toInfo = (stored: StoredStreak, todayKey: string): StreakInfo => {
-  const alive =
-    stored.lastDate === todayKey ||
-    stored.lastDate === previousDateKey(todayKey);
+const toInfo = async (
+  stored: StoredStreak,
+  todayKey: string
+): Promise<StreakInfo> => {
+  const history = await getDailyHistory(todayKey);
+  const alive = isStreakAlive(
+    stored.lastDate,
+    todayKey,
+    history.latest,
+    history.previous
+  );
   return {
     current: alive ? stored.current : 0,
     best: stored.best,
@@ -34,7 +42,9 @@ export const getStreak = async (
 
 /**
  * Count a completed daily challenge played on its own day. Playing again the
- * same day doesn't add to the streak; missing a day resets it to 1.
+ * same day doesn't add to the streak. Finishing the previous daily too adds
+ * one; missing a daily resets it to 1. Paused days have no daily, so they
+ * never break a streak.
  */
 export const recordDailyCompletion = async (
   userId: string,
@@ -42,8 +52,10 @@ export const recordDailyCompletion = async (
 ): Promise<StreakInfo> => {
   const stored = await load(userId);
   if (stored.lastDate !== todayKey) {
-    stored.current =
-      stored.lastDate === previousDateKey(todayKey) ? stored.current + 1 : 1;
+    const { previous } = await getDailyHistory(todayKey);
+    stored.current = extendsStreak(stored.lastDate, todayKey, previous)
+      ? stored.current + 1
+      : 1;
     stored.best = Math.max(stored.best, stored.current);
     stored.lastDate = todayKey;
     await redis.hSet(streakKey(userId), {

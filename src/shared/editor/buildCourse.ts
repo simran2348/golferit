@@ -1,4 +1,5 @@
 import type {
+  Bridge,
   CourseDefinition,
   Islet,
   Obstacle,
@@ -15,7 +16,9 @@ import {
   MIN_PAR,
   MIN_TRACK_TILES,
   NAME_MAX_LENGTH,
+  PORTAL_COUNT,
   TILE_SIZE,
+  itemTile,
   tileAt,
   type CourseDesign,
   type EditorItem,
@@ -37,6 +40,15 @@ const RAMP_HEIGHT = 0.15;
 const RAMP_TOP_LENGTH = 0.25;
 const SPINNER_ARM = 0.62;
 const SPINNER_SPEED = 1.4;
+const BRIDGE_WIDTH = 0.9;
+/** Bridge ends reach this far onto dry track so the joins look solid. */
+const BRIDGE_OVERHANG = WATER_INSET + 0.12;
+const TUNNEL_INNER_WIDTH = 0.8;
+const TUNNEL_OUTER_WIDTH = 1.4;
+const SAND_SIZE = 1.3;
+const BOOST_SIZE = 1.1;
+const BOOST_SPEED = 9;
+const PORTAL_RADIUS = 0.32;
 
 const isPlayable = (kind: TileKind) => kind !== 'empty';
 
@@ -134,8 +146,23 @@ const simplify = (loop: Vec2[]): Vec2[] =>
     );
   });
 
-const describeItem = (item: EditorItem) =>
-  item.kind[0]!.toUpperCase() + item.kind.slice(1);
+const ITEM_NAMES: Readonly<Record<EditorItem['kind'], string>> = {
+  tee: 'Tee',
+  cup: 'Cup',
+  bumper: 'Bumper',
+  windmill: 'Windmill',
+  slider: 'Slider',
+  ramp: 'Ramp',
+  spinner: 'Spinner',
+  wall: 'Angle wall',
+  bridge: 'Bridge',
+  tunnel: 'Tunnel',
+  sand: 'Sand trap',
+  boost: 'Boost pad',
+  portal: 'Teleporter',
+};
+
+const describeItem = (item: EditorItem) => ITEM_NAMES[item.kind];
 
 /**
  * Turn an editor design into a playable course, or explain why it isn't one.
@@ -193,11 +220,17 @@ export const buildCourseFromDesign = (
     const where = `${item.col},${item.row}`;
     if (occupied.has(where)) errors.push('Only one item per tile.');
     occupied.add(where);
-    if (kindAt(item.col, item.row) !== 'track') {
+    if (kindAt(item.col, item.row) !== itemTile(item.kind)) {
       errors.push(
-        `${describeItem(item)} must sit on track, not water or empty space.`
+        item.kind === 'bridge'
+          ? 'Bridges must sit on water.'
+          : `${describeItem(item)} must sit on track, not water or empty space.`
       );
     }
+  }
+  const portals = design.items.filter((i) => i.kind === 'portal');
+  if (portals.length !== 0 && portals.length !== PORTAL_COUNT) {
+    errors.push('Teleporters come in pairs. Place exactly two.');
   }
 
   const region = regions[0];
@@ -255,6 +288,15 @@ export const buildCourseFromDesign = (
   }
 
   const obstacles: Obstacle[] = [];
+  const bridges: Bridge[] = [];
+  const isBridge = (col: number, row: number, horizontal: boolean) =>
+    design.items.some(
+      (other) =>
+        other.kind === 'bridge' &&
+        other.col === col &&
+        other.row === row &&
+        (other.rotation % 2 === 0) === horizontal
+    );
   design.items.forEach((item, i) => {
     const center = tileCenter(item.col, item.row);
     const rotationY = (-item.rotation * Math.PI) / 2;
@@ -341,11 +383,72 @@ export const buildCourseFromDesign = (
         });
         break;
       }
+      case 'bridge': {
+        // Rotation 0 carries the ball left/right. Consecutive bridges join
+        // edge to edge; free ends reach a little onto the dry track.
+        const horizontal = item.rotation % 2 === 0;
+        const [dc, dr] = horizontal ? [1, 0] : [0, 1];
+        const half = TILE_SIZE / 2;
+        const back = isBridge(item.col - dc, item.row - dr, horizontal)
+          ? half
+          : half + BRIDGE_OVERHANG;
+        const front = isBridge(item.col + dc, item.row + dr, horizontal)
+          ? half
+          : half + BRIDGE_OVERHANG;
+        bridges.push({
+          id: `bridge-${i}`,
+          from: { x: center.x - dc * back, z: center.z - dr * back },
+          to: { x: center.x + dc * front, z: center.z + dr * front },
+          width: BRIDGE_WIDTH,
+        });
+        break;
+      }
+      case 'tunnel':
+        obstacles.push({
+          kind: 'tunnel',
+          id: `tunnel-${i}`,
+          position: center,
+          rotationY: item.rotation % 2 === 0 ? 0 : -Math.PI / 2,
+          length: TILE_SIZE,
+          innerWidth: TUNNEL_INNER_WIDTH,
+          outerWidth: TUNNEL_OUTER_WIDTH,
+        });
+        break;
+      case 'sand':
+        obstacles.push({
+          kind: 'sand',
+          id: `sand-${i}`,
+          position: center,
+          size: SAND_SIZE,
+        });
+        break;
+      case 'boost':
+        obstacles.push({
+          kind: 'boost',
+          id: `boost-${i}`,
+          position: center,
+          // Rotation 0 points right; each turn is a quarter clockwise.
+          rotationY,
+          size: BOOST_SIZE,
+          speed: BOOST_SPEED,
+        });
+        break;
       case 'tee':
       case 'cup':
+      case 'portal':
         break;
     }
   });
+  const [portalA, portalB] = portals;
+  if (portalA && portalB) {
+    obstacles.push({
+      kind: 'portal',
+      id: 'portal',
+      a: tileCenter(portalA.col, portalA.row),
+      b: tileCenter(portalB.col, portalB.row),
+      radius: PORTAL_RADIUS,
+    });
+  }
 
   return {
     ok: true,
@@ -357,7 +460,7 @@ export const buildCourseFromDesign = (
       tee: tileCenter(tees[0]!.col, tees[0]!.row),
       cup: tileCenter(cups[0]!.col, cups[0]!.row),
       water: ponds,
-      bridges: [],
+      bridges,
       obstacles,
       scenery: decorate(outline),
       islets: islets(outline),

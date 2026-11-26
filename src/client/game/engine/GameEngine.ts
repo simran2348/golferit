@@ -7,6 +7,10 @@ import { createAimIndicator, type AimIndicator } from '../objects/aimIndicator';
 import { createCourseScene } from '../objects/course';
 import { createMaterials } from '../objects/materials';
 import { createSplash, type SplashEffect } from '../objects/splash';
+import {
+  createTeleportFlash,
+  type TeleportFlash,
+} from '../objects/teleportFlash';
 import { loadPhysics } from '../physics/loadPhysics';
 import type { PhysicsWorld } from '../physics/PhysicsWorld';
 import { CameraRig } from './camera';
@@ -43,6 +47,7 @@ export class GameEngine {
   private readonly ball: Mesh;
   private readonly aimIndicator: AimIndicator;
   private readonly splash: SplashEffect;
+  private readonly teleportFlash: TeleportFlash;
   private gameplay: Gameplay | null = null;
   private aim: Aim | null = null;
   private elapsed = 0;
@@ -63,10 +68,12 @@ export class GameEngine {
     this.ball = course3d.ball;
     this.framingPoints = course3d.framingPoints;
     this.splash = createSplash();
+    this.teleportFlash = createTeleportFlash();
     this.updatables = [
       ...course3d.updatables,
       environment.updatable,
       this.splash.updatable,
+      this.teleportFlash.updatable,
     ];
     this.aimIndicator = createAimIndicator();
 
@@ -78,6 +85,7 @@ export class GameEngine {
       environment.ocean,
       this.aimIndicator.group,
       this.splash.group,
+      this.teleportFlash.group,
       createLighting(shadowBounds, isCoarsePointer() ? 1024 : 2048)
     );
 
@@ -135,7 +143,10 @@ export class GameEngine {
       physics,
       this.session,
       this.ball,
-      { splash: (position) => this.splash.trigger(position) }
+      {
+        splash: (position) => this.splash.trigger(position),
+        teleport: (from, to) => this.teleportFlash.trigger(from, to),
+      }
     );
     const controls = new ShotControls({
       element: this.renderer.domElement,

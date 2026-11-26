@@ -29,6 +29,20 @@
         "endpoint": "/internal/menu/daily-post"
       },
       {
+        "label": "Pause daily challenges",
+        "description": "Stop the automatic Golferit daily post until resumed",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/daily-pause"
+      },
+      {
+        "label": "Resume daily challenges",
+        "description": "Restart the automatic Golferit daily post (00:00 UTC)",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/daily-resume"
+      },
+      {
         "label": "Create a practice post",
         "description": "Create a Golferit practice post on a hole you choose",
         "location": "subreddit",

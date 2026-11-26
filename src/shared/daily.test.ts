@@ -5,18 +5,18 @@ import { createStarterDesign, withTile } from './editor/design.ts';
 import {
   COMMUNITY_COURSE_ID,
   courseForPost,
-  challengeNumber,
-  courseForDate,
+  courseForNumber,
+  dailyPostData,
+  extendsStreak,
+  isStreakAlive,
+  legacyChallengeNumber,
   parsePostData,
   postLabel,
   previousDateKey,
   utcDateKey,
 } from './daily.ts';
 
-const DAY_MS = 24 * 60 * 60 * 1000;
 const EPOCH = '2026-11-18';
-const addDays = (key: string, days: number): string =>
-  utcDateKey(new Date(Date.parse(`${key}T00:00:00Z`) + days * DAY_MS));
 
 describe('utcDateKey', () => {
   test('uses the UTC date, not the local one', () => {
@@ -51,33 +51,79 @@ describe('previousDateKey', () => {
   });
 });
 
-describe('challengeNumber', () => {
-  test('the epoch is challenge #1 and numbers go up by one a day', () => {
-    assert.equal(challengeNumber(EPOCH), 1);
-    assert.equal(challengeNumber('2026-11-19'), 2);
-    assert.equal(challengeNumber('2026-12-01'), 14);
-    assert.equal(challengeNumber('2027-03-15'), 118);
-  });
-
-  test('days before the epoch count down from 0', () => {
-    assert.equal(challengeNumber('2026-11-17'), 0);
+describe('legacyChallengeNumber', () => {
+  test('the epoch is #1 and numbers go up by one a day', () => {
+    assert.equal(legacyChallengeNumber(EPOCH), 1);
+    assert.equal(legacyChallengeNumber('2026-11-19'), 2);
+    assert.equal(legacyChallengeNumber('2026-12-01'), 14);
+    assert.equal(legacyChallengeNumber('2027-03-15'), 118);
   });
 });
 
-describe('courseForDate', () => {
+describe('courseForNumber', () => {
   test('rotates through the whole catalog in order, then repeats', () => {
     const count = COURSE_CATALOG.length;
-    for (let day = 0; day < count * 2 + 1; day++) {
-      assert.equal(
-        courseForDate(addDays(EPOCH, day)).id,
-        COURSE_CATALOG[day % count]?.id
-      );
+    for (let n = 1; n <= count * 2 + 1; n++) {
+      assert.equal(courseForNumber(n).id, COURSE_CATALOG[(n - 1) % count]?.id);
     }
   });
 
-  test('stays inside the catalog for dates before the epoch', () => {
+  test('stays inside the catalog for numbers below 1', () => {
     const last = COURSE_CATALOG[COURSE_CATALOG.length - 1];
-    assert.equal(courseForDate(addDays(EPOCH, -1)).id, last?.id);
+    assert.equal(courseForNumber(0).id, last?.id);
+  });
+});
+
+describe('dailyPostData', () => {
+  test('uses the given number, not the date', () => {
+    const data = dailyPostData('2026-12-25', 4);
+    assert.equal(data.number, 4);
+    assert.equal(data.date, '2026-12-25');
+    assert.equal(data.courseId, courseForNumber(4).id);
+  });
+});
+
+describe('streaks across paused days', () => {
+  // Dailies on the 20th and 21st, paused 22nd-24th, resumed on the 25th.
+  const before = '2026-11-21';
+  const resumed = '2026-11-25';
+
+  test('finishing the first daily after a pause extends the streak', () => {
+    assert.equal(extendsStreak(before, resumed, before), true);
+  });
+
+  test('missing the daily before it restarts the streak', () => {
+    assert.equal(extendsStreak('2026-11-20', resumed, before), false);
+    assert.equal(extendsStreak(null, resumed, before), false);
+  });
+
+  test('the very first daily has nothing before it', () => {
+    assert.equal(extendsStreak('2026-11-24', '2026-11-25', ''), false);
+  });
+
+  test('unknown history falls back to calendar days', () => {
+    assert.equal(extendsStreak('2026-11-24', '2026-11-25', null), true);
+    assert.equal(extendsStreak('2026-11-23', '2026-11-25', null), false);
+  });
+
+  test('stays alive on paused days for players of the latest daily', () => {
+    assert.equal(isStreakAlive(before, '2026-11-23', before, null), true);
+    assert.equal(
+      isStreakAlive('2026-11-20', '2026-11-23', before, null),
+      false
+    );
+  });
+
+  test('on a day with a daily, alive if played today or the daily before', () => {
+    assert.equal(isStreakAlive(resumed, resumed, resumed, before), true);
+    assert.equal(isStreakAlive(before, resumed, resumed, before), true);
+    assert.equal(isStreakAlive('2026-11-20', resumed, resumed, before), false);
+    assert.equal(isStreakAlive(null, resumed, resumed, before), false);
+  });
+
+  test('without history, yesterday keeps it alive', () => {
+    assert.equal(isStreakAlive('2026-11-24', resumed, null, null), true);
+    assert.equal(isStreakAlive('2026-11-23', resumed, null, null), false);
   });
 });
 

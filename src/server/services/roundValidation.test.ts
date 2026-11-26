@@ -6,7 +6,7 @@ import {
   MIN_ROUND_MS,
   ROUND_TTL_SECONDS,
 } from '../../shared/constants/game.ts';
-import { MEADOW_MILL } from '../../shared/courses/meadowMill.ts';
+import { MEADOW_MILL } from '../../shared/courses/retired/meadowMill.ts';
 import {
   parseShotLog,
   parseSubmitRequest,

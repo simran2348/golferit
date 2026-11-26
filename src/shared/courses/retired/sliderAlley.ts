@@ -1,4 +1,4 @@
-import type { CourseDefinition } from '../types/course';
+import type { CourseDefinition } from '../../types/course';
 
 /**
  * Two sliding blocks sweep across the main lane and a third guards the dogleg

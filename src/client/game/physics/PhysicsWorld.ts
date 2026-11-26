@@ -178,6 +178,21 @@ export class PhysicsWorld {
     this.ballBody.setLinvel({ x: velocity.x, y: 0, z: velocity.z }, true);
   }
 
+  /** Replace the ball's horizontal velocity (boost pads), keeping vertical. */
+  setBallHorizontalVelocity(velocity: Vec2): void {
+    const v = this.ballBody.linvel();
+    this.ballBody.setLinvel({ x: velocity.x, y: v.y, z: velocity.z }, true);
+  }
+
+  /** Move the ball without changing its velocity (teleporters). */
+  moveBall(position: Vec2): void {
+    const t = this.ballBody.translation();
+    this.ballBody.setTranslation(
+      { x: position.x, y: t.y, z: position.z },
+      true
+    );
+  }
+
   stopBall(): void {
     this.ballBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
     this.ballBody.setAngvel({ x: 0, y: 0, z: 0 }, true);

@@ -54,22 +54,64 @@ const dateKeyToMs = (key: string): number => Date.parse(`${key}T00:00:00Z`);
 export const previousDateKey = (key: string): string =>
   utcDateKey(new Date(dateKeyToMs(key) - DAY_MS));
 
-export const challengeNumber = (key: string): number =>
+/**
+ * The number the old date-based scheme gave a day (days since the epoch, +1).
+ * Only used to carry existing subreddits over to the posted-daily counter.
+ */
+export const legacyChallengeNumber = (key: string): number =>
   Math.round((dateKeyToMs(key) - dateKeyToMs(DAILY_EPOCH)) / DAY_MS) + 1;
 
-/** Deterministic rotation through the catalog. */
-export const courseForDate = (key: string): CourseDefinition => {
+/**
+ * Daily challenge #n plays the nth hole of the rotation. Numbers count posted
+ * dailies, so a pause doesn't skip any holes or numbers.
+ */
+export const courseForNumber = (number: number): CourseDefinition => {
   const count = COURSE_CATALOG.length;
-  const index = (((challengeNumber(key) - 1) % count) + count) % count;
+  const index = (((number - 1) % count) + count) % count;
   return COURSE_CATALOG[index] ?? DEFAULT_COURSE;
 };
 
-export const dailyPostData = (key: string): DailyPostData => ({
+export const dailyPostData = (key: string, number: number): DailyPostData => ({
   kind: 'daily',
-  courseId: courseForDate(key).id,
+  courseId: courseForNumber(number).id,
   date: key,
-  number: challengeNumber(key),
+  number,
 });
+
+/**
+ * Is a streak still alive today? `lastDate` is the player's last daily
+ * played on its own day. The streak survives if that was today, or the most
+ * recent daily before today's: days without a daily (paused) don't count.
+ * `latestDaily` is the newest daily's date; `previousDaily` the one before
+ * today's. Either can be null for dailies posted before this was tracked,
+ * which falls back to calendar days.
+ */
+export const isStreakAlive = (
+  lastDate: string | null,
+  todayKey: string,
+  latestDaily: string | null,
+  previousDaily: string | null
+): boolean => {
+  if (lastDate === null) return false;
+  if (lastDate === todayKey) return true;
+  const latest = latestDaily ?? todayKey;
+  const reference =
+    latest === todayKey ? (previousDaily ?? previousDateKey(todayKey)) : latest;
+  return lastDate === reference;
+};
+
+/**
+ * Does finishing today's daily add to the streak (rather than restart it)?
+ * Yes if the player finished the daily before it. `previousDaily` is '' for
+ * the very first daily, and null when unknown (falls back to yesterday).
+ */
+export const extendsStreak = (
+  lastDate: string | null,
+  todayKey: string,
+  previousDaily: string | null
+): boolean =>
+  lastDate !== null &&
+  lastDate === (previousDaily ?? previousDateKey(todayKey));
 
 /** "Nov 18" */
 export const formatChallengeDate = (key: string): string =>

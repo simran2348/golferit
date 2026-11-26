@@ -1,5 +1,7 @@
 import type {
+  BoostObstacle,
   Obstacle,
+  PortalObstacle,
   RampObstacle,
   SliderObstacle,
   SpinnerObstacle,
@@ -72,3 +74,71 @@ export const surfaceHeightAt = (obstacles: Obstacle[], point: Vec2): number => {
   }
   return height;
 };
+
+/** Ball centre inside an axis-aligned square (sand traps, boost pads). */
+const inSquare = (center: Vec2, size: number, point: Vec2): boolean =>
+  Math.abs(point.x - center.x) <= size / 2 &&
+  Math.abs(point.z - center.z) <= size / 2;
+
+/** Is the ball centre in any sand trap? */
+export const isInSand = (obstacles: Obstacle[], point: Vec2): boolean =>
+  obstacles.some(
+    (obstacle) =>
+      obstacle.kind === 'sand' &&
+      inSquare(obstacle.position, obstacle.size, point)
+  );
+
+/** Boost pads whose square contains the point. */
+export const boostsAt = (obstacles: Obstacle[], point: Vec2): BoostObstacle[] =>
+  obstacles.filter(
+    (obstacle): obstacle is BoostObstacle =>
+      obstacle.kind === 'boost' &&
+      inSquare(obstacle.position, obstacle.size, point)
+  );
+
+/** Unit vector the pad's arrow points along (local +X in world space). */
+export const boostDirection = (boost: BoostObstacle): Vec2 => ({
+  x: Math.cos(boost.rotationY),
+  z: -Math.sin(boost.rotationY),
+});
+
+/** Every pass over a pad adds at least this much speed along the arrow. */
+export const BOOST_EXTRA_SPEED = 3;
+/** ...but never pushes the ball faster than this. */
+export const BOOST_MAX_SPEED = 14;
+
+/**
+ * Velocity after rolling onto a boost pad: the component along the arrow gets
+ * a push of BOOST_EXTRA_SPEED and is at least the pad's speed (capped at
+ * BOOST_MAX_SPEED); sideways drift is halved so the ball lines up with the
+ * arrow.
+ */
+export const boostVelocity = (boost: BoostObstacle, velocity: Vec2): Vec2 => {
+  const dir = boostDirection(boost);
+  const along = velocity.x * dir.x + velocity.z * dir.z;
+  const sideX = velocity.x - along * dir.x;
+  const sideZ = velocity.z - along * dir.z;
+  const boosted = Math.max(
+    along,
+    Math.min(Math.max(along + BOOST_EXTRA_SPEED, boost.speed), BOOST_MAX_SPEED)
+  );
+  return {
+    x: dir.x * boosted + sideX * 0.5,
+    z: dir.z * boosted + sideZ * 0.5,
+  };
+};
+
+export type PortalEnd = 'a' | 'b';
+
+/** Which end of a teleporter pair the point is in, if any. */
+export const portalEndAt = (
+  portal: PortalObstacle,
+  point: Vec2
+): PortalEnd | null => {
+  const within = (end: Vec2) =>
+    Math.hypot(point.x - end.x, point.z - end.z) <= portal.radius;
+  return within(portal.a) ? 'a' : within(portal.b) ? 'b' : null;
+};
+
+export const otherPortalEnd = (end: PortalEnd): PortalEnd =>
+  end === 'a' ? 'b' : 'a';

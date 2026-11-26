@@ -30,7 +30,12 @@ export type ItemKind =
   | 'slider'
   | 'ramp'
   | 'spinner'
-  | 'wall';
+  | 'wall'
+  | 'bridge'
+  | 'tunnel'
+  | 'sand'
+  | 'boost'
+  | 'portal';
 
 export type EditorItem = {
   kind: ItemKind;
@@ -51,7 +56,8 @@ export type CourseDesign = {
 /**
  * How many distinct orientations each item has; tapping a placed item cycles
  * through them. 1 = no orientation. For the spinner the two states are spin
- * directions (clockwise / counter-clockwise); for the wall, `\` and `/`.
+ * directions (clockwise / counter-clockwise); for the wall, `\` and `/`;
+ * for the boost pad, the four arrow directions.
  */
 export const ORIENTATIONS: Readonly<Record<ItemKind, number>> = {
   tee: 1,
@@ -62,7 +68,17 @@ export const ORIENTATIONS: Readonly<Record<ItemKind, number>> = {
   ramp: 2,
   spinner: 2,
   wall: 2,
+  bridge: 2,
+  tunnel: 2,
+  sand: 1,
+  boost: 4,
+  portal: 1,
 };
+/** Teleporters come as one linked pair. */
+export const PORTAL_COUNT = 2;
+/** Bridges sit on water; every other item sits on track. */
+export const itemTile = (kind: ItemKind): TileKind =>
+  kind === 'bridge' ? 'water' : 'track';
 /** Exactly one of each is required. */
 export const UNIQUE_ITEMS: ReadonlySet<ItemKind> = new Set(['tee', 'cup']);
 

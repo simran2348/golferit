@@ -6,6 +6,14 @@ import {
   PHYSICS_STEP,
 } from '../../../shared/constants/game';
 import {
+  boostVelocity,
+  boostsAt,
+  isInSand,
+  otherPortalEnd,
+  portalEndAt,
+  type PortalEnd,
+} from '../../../shared/course/obstacles';
+import {
   isBallInCup,
   isBallInWater,
   isBallOutOfBounds,
@@ -22,6 +30,8 @@ const MAX_STEPS_PER_FRAME = 8;
 const ROLL_DAMPING = 0.75;
 const SLOW_DAMPING = 2.4;
 const SLOW_SPEED = 0.7;
+/** Sand bogs the ball down hard. */
+const SAND_DAMPING = 3.5;
 
 /** Ball counts as stopped after staying below this speed for REST_TIME. */
 const REST_SPEED = 0.06;
@@ -35,6 +45,8 @@ const WATER_SINK_Y = -0.45;
 export type GameplayEffects = {
   /** The ball just hit the water at this point. */
   splash?: (position: Vector3) => void;
+  /** The ball just went through a teleporter. */
+  teleport?: (from: Vec2, to: Vec2) => void;
 };
 
 type Sink = {
@@ -58,6 +70,10 @@ export class GameplaySystem {
   private readonly position = new Vector3();
   private readonly velocity = new Vector3();
   private readonly unsubscribeRestart: () => void;
+  /** Boost pads the ball is on that have already kicked it. */
+  private readonly usedBoosts = new Set<string>();
+  /** Per teleporter: the end the ball arrived at and hasn't left yet. */
+  private readonly portalLocks = new Map<string, PortalEnd>();
 
   constructor(
     private readonly course: CourseDefinition,
@@ -149,9 +165,16 @@ export class GameplaySystem {
       this.returnWithPenalty('Out of bounds! +1 stroke');
       return;
     }
+    if (this.teleport(position)) return;
+    this.applyBoosts(position, velocity);
 
+    const point = { x: position.x, z: position.z };
     this.physics.setBallDamping(
-      speed < SLOW_SPEED ? SLOW_DAMPING : ROLL_DAMPING
+      isInSand(this.course.obstacles, point)
+        ? SAND_DAMPING
+        : speed < SLOW_SPEED
+          ? SLOW_DAMPING
+          : ROLL_DAMPING
     );
 
     if (speed < REST_SPEED && Math.abs(velocity.y) < REST_SPEED) {
@@ -163,6 +186,63 @@ export class GameplaySystem {
       }
     } else {
       this.restTimer = 0;
+    }
+  }
+
+  /** Kick once per visit to each pad. */
+  private applyBoosts(position: Vector3, velocity: Vector3): void {
+    const pads = boostsAt(this.course.obstacles, {
+      x: position.x,
+      z: position.z,
+    });
+    for (const id of this.usedBoosts) {
+      if (!pads.some((pad) => pad.id === id)) this.usedBoosts.delete(id);
+    }
+    for (const pad of pads) {
+      if (this.usedBoosts.has(pad.id)) continue;
+      this.usedBoosts.add(pad.id);
+      this.physics.setBallHorizontalVelocity(
+        boostVelocity(pad, { x: velocity.x, z: velocity.z })
+      );
+    }
+  }
+
+  /**
+   * Into one end, out of the other with the same velocity. The exit stays
+   * locked until the ball rolls clear of it, so it can't bounce straight back.
+   */
+  private teleport(position: Vector3): boolean {
+    const point = { x: position.x, z: position.z };
+    for (const obstacle of this.course.obstacles) {
+      if (obstacle.kind !== 'portal') continue;
+      const end = portalEndAt(obstacle, point);
+      const locked = this.portalLocks.get(obstacle.id);
+      if (end === null) {
+        this.portalLocks.delete(obstacle.id);
+        continue;
+      }
+      if (end === locked) continue;
+      const exit = otherPortalEnd(end);
+      const to = obstacle[exit];
+      this.physics.moveBall(to);
+      this.portalLocks.set(obstacle.id, exit);
+      this.effects.teleport?.(point, to);
+      return true;
+    }
+    return false;
+  }
+
+  /** After placing the ball, don't fire a teleporter or pad it rests on. */
+  private resetObstacleState(at: Vec2): void {
+    this.usedBoosts.clear();
+    this.portalLocks.clear();
+    for (const pad of boostsAt(this.course.obstacles, at)) {
+      this.usedBoosts.add(pad.id);
+    }
+    for (const obstacle of this.course.obstacles) {
+      if (obstacle.kind !== 'portal') continue;
+      const end = portalEndAt(obstacle, at);
+      if (end) this.portalLocks.set(obstacle.id, end);
     }
   }
 
@@ -202,6 +282,7 @@ export class GameplaySystem {
 
   private returnWithPenalty(message: string): void {
     this.physics.placeBall(this.lastRestPosition);
+    this.resetObstacleState(this.lastRestPosition);
     this.physics.getBallPosition(this.ballMesh.position);
     this.restTimer = 0;
     this.session.penalty(message);
@@ -213,6 +294,7 @@ export class GameplaySystem {
     this.restTimer = 0;
     this.lastRestPosition = { ...this.course.tee };
     this.physics.placeBall(this.course.tee);
+    this.resetObstacleState(this.course.tee);
     this.physics.getBallPosition(this.ballMesh.position);
   }
 }

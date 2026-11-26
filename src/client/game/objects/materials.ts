@@ -1,6 +1,7 @@
 import {
   CanvasTexture,
   DoubleSide,
+  MeshBasicMaterial,
   MeshLambertMaterial,
   MeshStandardMaterial,
   RepeatWrapping,
@@ -32,6 +33,13 @@ export const PALETTE = {
   plank: '#b07a45',
   rampTurf: '#5cc23f',
   splash: '#eaf8ff',
+  sand: '#e9d29a',
+  sandRim: '#d2b577',
+  boostPad: '#2a3550',
+  boostArrow: '#ffcc33',
+  portalRing: '#b07cff',
+  portalCore: '#2b1450',
+  portalGlow: '#e7d6ff',
 } as const;
 
 /** Mown-stripe grass texture generated at runtime: no image download needed. */
@@ -97,6 +105,16 @@ export const createMaterials = () => ({
   rock: flat(PALETTE.rock),
   stone: flat(PALETTE.stone),
   plank: flat(PALETTE.plank),
+  sand: new MeshLambertMaterial({ color: PALETTE.sand }),
+  sandRim: flat(PALETTE.sandRim),
+  boostPad: flat(PALETTE.boostPad),
+  portalRing: new MeshStandardMaterial({
+    color: PALETTE.portalRing,
+    emissive: PALETTE.portalRing,
+    emissiveIntensity: 0.6,
+    roughness: 0.4,
+  }),
+  portalCore: new MeshBasicMaterial({ color: PALETTE.portalCore }),
   tunnelRoof: new MeshLambertMaterial({
     color: PALETTE.windmillRoof,
     side: DoubleSide,

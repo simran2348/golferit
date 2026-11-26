@@ -1,4 +1,4 @@
-import type { CourseDefinition } from '../types/course';
+import type { CourseDefinition } from '../../types/course';
 
 /**
  * A U-turn: through the tunnel, past a slider in the bend, then back across a
