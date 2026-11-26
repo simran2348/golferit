@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { CourseDefinition } from '../../shared/types/course';
+import type { ShotRecord } from '../../shared/api';
 import { scoreLabel } from '../../shared/course/rules';
 import { GameCanvas } from '../components/GameCanvas';
 import { RoundTimer } from '../components/RoundTimer';
@@ -8,11 +9,17 @@ import { ZoomController } from '../game/engine/ZoomController';
 import { GameSession } from '../game/logic/GameSession';
 import { useGameSnapshot } from '../hooks/useGameSnapshot';
 
+export type VerifiedRun = {
+  shots: ShotRecord[];
+  penalties: number;
+  strokes: number;
+};
+
 type TestPlayProps = {
   course: CourseDefinition;
   onExit: () => void;
-  /** Called when the creator sinks the ball. */
-  onVerified: (strokes: number) => void;
+  /** Called when the creator sinks the ball, with the winning run. */
+  onVerified: (run: VerifiedRun) => void;
 };
 
 const chip =
@@ -31,7 +38,11 @@ export const TestPlay = ({ course, onExit, onVerified }: TestPlayProps) => {
     () =>
       session.onEvent((event) => {
         if (event.type === 'holed') {
-          onVerified(event.shots.length + event.penalties);
+          onVerified({
+            shots: event.shots,
+            penalties: event.penalties,
+            strokes: event.shots.length + event.penalties,
+          });
         }
       }),
     [session, onVerified]

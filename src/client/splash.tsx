@@ -47,7 +47,11 @@ export const Splash = () => {
       />
       <div className="relative flex flex-col items-center gap-1">
         <p className="text-xs font-bold tracking-[0.3em] text-white/90 uppercase">
-          {post.kind === 'daily' ? 'Daily Challenge' : '3D Mini Golf'}
+          {post.kind === 'daily'
+            ? 'Daily Challenge'
+            : post.kind === 'community'
+              ? 'Community Course'
+              : '3D Mini Golf'}
         </p>
         <h1 className="text-5xl font-black tracking-tight text-white drop-shadow-[0_4px_0_rgba(12,74,110,0.35)]">
           Golferit

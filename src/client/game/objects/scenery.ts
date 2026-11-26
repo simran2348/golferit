@@ -6,7 +6,8 @@ import {
   Mesh,
   type BufferGeometry,
 } from 'three';
-import type { Islet, SceneryItem } from '../../../shared/types/course';
+import type { Islet, SceneryItem, Vec2 } from '../../../shared/types/course';
+import { CAT_SCALE, createCat } from './cat';
 import type { Updatable } from '../engine/types';
 import type { Materials } from './materials';
 
@@ -58,6 +59,28 @@ const createSceneryItem = (
 };
 
 const ISLET_THICKNESS = 0.45;
+/** Tree foliage radius at scale 1 (the cat circles just outside it). */
+const FOLIAGE_RADIUS = 0.6;
+/** Keep the cat this far in from the islet's edge. */
+const EDGE_MARGIN = 0.25;
+
+/**
+ * Where the cat runs: around the islet's first tree, just clear of the
+ * foliage, without stepping off the edge. No tree (or no room): a circle
+ * around the islet's centre instead.
+ */
+const catOrbit = (islet: Islet): [Vec2, number] => {
+  const tree = islet.scenery.find((item) => item.kind === 'tree');
+  if (tree) {
+    // Clear of the foliage by about half a cat.
+    const radius = FOLIAGE_RADIUS * tree.scale + 0.15 * CAT_SCALE;
+    const fromCenter = Math.hypot(tree.position.x, tree.position.z);
+    if (fromCenter + radius <= islet.radius - EDGE_MARGIN) {
+      return [tree.position, radius];
+    }
+  }
+  return [{ x: 0, z: 0 }, Math.max(islet.radius * 0.55, 0.3)];
+};
 
 /** Small decorative floating island that bobs gently. */
 const createIslet = (
@@ -89,13 +112,18 @@ const createIslet = (
     group.add(createSceneryItem(item, 0, geometries, materials));
   }
 
+  // The first islet has a resident cat, playing with yarn around its tree.
+  const cat = index === 0 ? createCat(...catOrbit(islet)) : null;
+  if (cat) group.add(cat.group);
+
   const baseY = islet.position.y;
   const phase = index * 1.7;
   return {
     group,
     updatable: {
-      update: (elapsed) => {
+      update: (elapsed, delta) => {
         group.position.y = baseY + Math.sin(elapsed * 0.6 + phase) * 0.12;
+        cat?.updatable.update(elapsed, delta);
       },
     },
   };

@@ -1,4 +1,4 @@
-import { showToast } from '@devvit/web/client';
+import { navigateTo, showToast } from '@devvit/web/client';
 import { lazy, Suspense, useCallback, useMemo, useState } from 'react';
 import {
   MAX_PAR,
@@ -18,6 +18,8 @@ import {
   type ToolInfo,
 } from './tools';
 import { useEditorDraft, type SaveStatus } from './useEditorDraft';
+import { ApiError, publishCourse } from '../services/api';
+import type { VerifiedRun } from './TestPlay';
 
 // The 3D engine and physics load only when you press Test play.
 const TestPlay = lazy(() =>
@@ -103,13 +105,20 @@ export const EditorScreen = () => {
   const { design } = draft;
   const [tool, setTool] = useState<Tool>('track');
   const [testCourse, setTestCourse] = useState<CourseDefinition | null>(null);
-  const [verifiedKey, setVerifiedKey] = useState<string | null>(null);
+  /** Best winning test run, tied to the exact layout it was played on. */
+  const [verifiedRun, setVerifiedRun] = useState<
+    (VerifiedRun & { key: string }) | null
+  >(null);
+  const [publishStep, setPublishStep] = useState<
+    'closed' | 'confirm' | 'publishing'
+  >('closed');
   const [previewCourse, setPreviewCourse] = useState<CourseDefinition | null>(
     null
   );
 
   const build = useMemo(() => buildCourseFromDesign(design, 'draft'), [design]);
-  const verified = verifiedKey === designKey(design);
+  const testedKey = useMemo(() => designKey(design), [design]);
+  const verified = verifiedRun?.key === testedKey ? verifiedRun : null;
   const toolInfo = TOOLS.find((t) => t.id === tool);
 
   const paint = useCallback(
@@ -121,11 +130,36 @@ export const EditorScreen = () => {
   const startTest = () => {
     if (build.ok) setTestCourse(build.course);
   };
-  const testedKey = useMemo(() => designKey(design), [design]);
   const handleVerified = useCallback(
-    () => setVerifiedKey(testedKey),
+    (run: VerifiedRun) =>
+      setVerifiedRun((previous) =>
+        previous?.key === testedKey && previous.strokes <= run.strokes
+          ? previous
+          : { ...run, key: testedKey }
+      ),
     [testedKey]
   );
+
+  const publish = async () => {
+    if (!verified) return;
+    setPublishStep('publishing');
+    try {
+      const { url } = await publishCourse({
+        design,
+        shots: verified.shots,
+        penalties: verified.penalties,
+      });
+      showToast({ text: 'Your course is live!', appearance: 'success' });
+      navigateTo(url);
+    } catch (error) {
+      setPublishStep('closed');
+      showToast(
+        error instanceof ApiError && error.code !== 'network'
+          ? error.message
+          : 'Could not publish. Try again.'
+      );
+    }
+  };
 
   return (
     <main className="relative flex h-full flex-col bg-gradient-to-b from-sky-300 to-sky-500 select-none">
@@ -249,20 +283,84 @@ export const EditorScreen = () => {
           >
             {build.ok
               ? verified
-                ? 'You sank it. Ready to publish (coming next).'
+                ? `You sank it in ${verified.strokes}. Ready to publish!`
                 : 'Looks playable! Test it to verify.'
               : `${build.errors[0] ?? ''}${build.errors.length > 1 ? ` (+${build.errors.length - 1} more)` : ''}`}
           </p>
         </div>
-        <button
-          type="button"
-          disabled={!build.ok}
-          onClick={startTest}
-          className="shrink-0 rounded-full bg-orange-500 px-5 py-3 font-extrabold text-white shadow-[0_4px_0_#c2410c] transition hover:bg-orange-400 active:translate-y-1 active:shadow-[0_1px_0_#c2410c] disabled:bg-slate-400 disabled:shadow-none"
-        >
-          ▶ Test
-        </button>
+        {verified ? (
+          <>
+            <button
+              type="button"
+              onClick={startTest}
+              aria-label="Test again"
+              className="h-12 w-12 shrink-0 rounded-full bg-white/95 text-lg font-black text-orange-600 shadow hover:bg-white"
+            >
+              ▶
+            </button>
+            <button
+              type="button"
+              onClick={() => setPublishStep('confirm')}
+              className="shrink-0 rounded-full bg-emerald-600 px-5 py-3 font-extrabold text-white shadow-[0_4px_0_#047857] transition hover:bg-emerald-500 active:translate-y-1 active:shadow-[0_1px_0_#047857]"
+            >
+              Publish
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            disabled={!build.ok}
+            onClick={startTest}
+            className="shrink-0 rounded-full bg-orange-500 px-5 py-3 font-extrabold text-white shadow-[0_4px_0_#c2410c] transition hover:bg-orange-400 active:translate-y-1 active:shadow-[0_1px_0_#c2410c] disabled:bg-slate-400 disabled:shadow-none"
+          >
+            ▶ Test
+          </button>
+        )}
       </footer>
+
+      {publishStep !== 'closed' && verified ? (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-sky-950/40 p-6 backdrop-blur-[2px]">
+          <div
+            role="dialog"
+            aria-labelledby="publish-title"
+            className="animate-notice-in w-full max-w-xs rounded-3xl bg-white p-6 text-center shadow-2xl"
+          >
+            <p className="text-xs font-bold tracking-widest text-emerald-600 uppercase">
+              Publish course
+            </p>
+            <h2
+              id="publish-title"
+              className="mt-1 truncate text-2xl font-black text-slate-800"
+            >
+              {design.name.trim()}
+            </h2>
+            <p className="mt-2 text-sm text-slate-600">
+              This posts your course to the subreddit, credited to you. Anyone
+              can play it and climb its leaderboard. Par {design.par}; you sank
+              it in {verified.strokes}.
+            </p>
+            <div className="mt-5 flex flex-col gap-2">
+              <button
+                type="button"
+                autoFocus
+                disabled={publishStep === 'publishing'}
+                onClick={() => void publish()}
+                className="w-full rounded-full bg-emerald-600 py-3 font-extrabold text-white shadow-[0_4px_0_#047857] hover:bg-emerald-500 disabled:cursor-wait disabled:opacity-70"
+              >
+                {publishStep === 'publishing' ? 'Publishing…' : 'Publish'}
+              </button>
+              <button
+                type="button"
+                disabled={publishStep === 'publishing'}
+                onClick={() => setPublishStep('closed')}
+                className="w-full rounded-full bg-slate-100 py-2.5 font-bold text-slate-700 hover:bg-slate-200 disabled:opacity-50"
+              >
+                Keep editing
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {/* Full-screen 3D: covers the editor, which stays mounted underneath. */}
       {previewCourse ? (

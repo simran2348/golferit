@@ -1,5 +1,8 @@
 import type { CourseDefinition } from './types/course';
+import { MAX_STROKES } from './constants/game';
 import { COURSE_CATALOG, DEFAULT_COURSE, getCourseById } from './courses';
+import { buildCourseFromDesign } from './editor/buildCourse';
+import { parseDesign, type CourseDesign } from './editor/design';
 
 /**
  * Stored on each post via `submitCustomPost({ postData })` (2 KB limit) and
@@ -18,7 +21,26 @@ export type PracticePostData = {
   courseId: string;
 };
 
-export type GolferitPostData = DailyPostData | PracticePostData;
+/**
+ * A course built by a player in the editor. The whole design travels in the
+ * post data (worst case ~1.2 KB of the 2 KB limit), so the course is frozen
+ * at publish time and loads without any extra request.
+ */
+export type CommunityPostData = {
+  kind: 'community';
+  design: CourseDesign;
+  /** Reddit username of the creator, without the u/ prefix. */
+  author: string;
+  /** Strokes the creator needed when they verified the course. */
+  creatorStrokes: number;
+};
+
+export type GolferitPostData =
+  DailyPostData | PracticePostData | CommunityPostData;
+
+/** Shared id for community courses; leaderboards are per post anyway. */
+export const COMMUNITY_COURSE_ID = 'community';
+const AUTHOR_PATTERN = /^[A-Za-z0-9_-]{1,32}$/;
 
 /** Daily challenge #1. */
 const DAILY_EPOCH = '2026-11-18';
@@ -64,6 +86,8 @@ const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
  * none and become practice posts on the default course.
  */
 export const parsePostData = (value: unknown): GolferitPostData => {
+  const community = parseCommunityPostData(value);
+  if (community) return community;
   if (typeof value === 'object' && value !== null && 'courseId' in value) {
     const { courseId } = value;
     if (typeof courseId === 'string' && getCourseById(courseId)) {
@@ -89,11 +113,52 @@ export const parsePostData = (value: unknown): GolferitPostData => {
   return { kind: 'practice', courseId: DEFAULT_COURSE.id };
 };
 
-export const courseForPost = (postData: GolferitPostData): CourseDefinition =>
-  getCourseById(postData.courseId) ?? DEFAULT_COURSE;
+/**
+ * Community post data, fully re-validated: the design must still build into
+ * a playable course. Anything off falls through to the default course.
+ */
+const parseCommunityPostData = (value: unknown): CommunityPostData | null => {
+  if (typeof value !== 'object' || value === null) return null;
+  if (!('kind' in value) || value.kind !== 'community') return null;
+  if (!('author' in value) || typeof value.author !== 'string') return null;
+  if (!AUTHOR_PATTERN.test(value.author)) return null;
+  if (!('creatorStrokes' in value) || !Number.isInteger(value.creatorStrokes)) {
+    return null;
+  }
+  const creatorStrokes = Number(value.creatorStrokes);
+  if (creatorStrokes < 1 || creatorStrokes > MAX_STROKES) return null;
+  const design = 'design' in value ? parseDesign(value.design) : null;
+  if (!design || !buildCommunityCourse(design)) return null;
+  return { kind: 'community', design, author: value.author, creatorStrokes };
+};
 
-/** Short label for HUD/splash: "Daily #12 · Nov 29" or "Practice". */
-export const postLabel = (postData: GolferitPostData): string =>
-  postData.kind === 'daily'
-    ? `Daily #${postData.number} · ${formatChallengeDate(postData.date)}`
-    : 'Practice';
+/** Designs are immutable once published, so cache the built course. */
+const builtCourses = new WeakMap<CourseDesign, CourseDefinition | null>();
+
+const buildCommunityCourse = (
+  design: CourseDesign
+): CourseDefinition | null => {
+  const cached = builtCourses.get(design);
+  if (cached !== undefined) return cached;
+  const result = buildCourseFromDesign(design, COMMUNITY_COURSE_ID);
+  const course = result.ok ? result.course : null;
+  builtCourses.set(design, course);
+  return course;
+};
+
+export const courseForPost = (postData: GolferitPostData): CourseDefinition =>
+  postData.kind === 'community'
+    ? (buildCommunityCourse(postData.design) ?? DEFAULT_COURSE)
+    : (getCourseById(postData.courseId) ?? DEFAULT_COURSE);
+
+/** Short label for HUD/splash: "Daily #12 · Nov 29", "By u/name", "Practice". */
+export const postLabel = (postData: GolferitPostData): string => {
+  switch (postData.kind) {
+    case 'daily':
+      return `Daily #${postData.number} · ${formatChallengeDate(postData.date)}`;
+    case 'community':
+      return `By u/${postData.author}`;
+    case 'practice':
+      return 'Practice';
+  }
+};

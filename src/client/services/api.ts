@@ -2,6 +2,8 @@ import type {
   DraftResponse,
   ErrorCode,
   JoinIntentResponse,
+  PublishRequest,
+  PublishResponse,
   SaveDraftResponse,
   SubscribeResponse,
   LeaderboardResponse,
@@ -109,6 +111,17 @@ export const fetchDraft = () => request('/api/editor/draft', isDraft);
 
 export const saveDraft = (design: CourseDesign) =>
   request('/api/editor/draft', isDraftSaved, sendJson({ design }, 'PUT'));
+
+const isPublished = (v: unknown): v is PublishResponse =>
+  hasType(v, 'published') &&
+  'url' in v &&
+  typeof v.url === 'string' &&
+  'postId' in v &&
+  typeof v.postId === 'string';
+
+/** Post a verified design to the subreddit as a community course. */
+export const publishCourse = (body: PublishRequest) =>
+  request('/api/editor/publish', isPublished, postJson(body));
 
 const isSubscribed = (v: unknown): v is SubscribeResponse =>
   hasType(v, 'subscribed');

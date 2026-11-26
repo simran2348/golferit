@@ -41,12 +41,23 @@ Reddit doesn't let apps read a user's subscriptions, so the app remembers who jo
 Tap **🛠 Build your own course** on any Golferit post to open the editor.
 
 - **Paint** track and water on a 10 × 14 grid. Walls are generated around the track automatically.
-- **Place** the tee, the cup, bumpers, windmills and sliders. Tap a windmill or slider again to rotate it.
+- **Place** the tee, the cup and obstacles: bumpers, angled walls, ramps, spinners, windmills and sliders. Tap a placed obstacle again to turn it.
 - **Undo** steps back one stroke at a time. Drafts **autosave to the server** (one per player), so they survive app updates and follow you across devices.
 - The status bar explains anything that would stop the course from working: no tee or cup, disconnected track, tiles touching only at a corner, track surrounding empty space, and so on.
 - **▶ Test** plays the draft in the real 3D engine. Nothing is submitted to any leaderboard. Sink the ball to **verify** the course; any edit clears the verification.
 
-Publishing courses as community posts is next on the roadmap.
+- **Publish** appears once you've sunk the ball. It posts the course to the subreddit as a **community course**, credited to you, with its own leaderboard.
+
+### Publishing
+
+| Step     | What happens                                                                                                                                                                                     |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Verify   | You sink the ball in **▶ Test**. The winning shot log is kept with the exact layout it was played on.                                                                                            |
+| Publish  | The server rebuilds the course from the design and checks your shot log against it. A broken course or a forged run is rejected.                                                                 |
+| Post     | The app account creates the post, titled `<name> by u/<you> · Par <n>`. The whole design is stored in the post's data (≤ 1.2 KB of the 2 KB limit), so the course is frozen and loads instantly. |
+| Cooldown | One publish per player every 5 minutes.                                                                                                                                                          |
+
+Community courses don't count toward streaks. Moderators remove them like any other post.
 
 ## Tech stack
 
@@ -199,7 +210,8 @@ Scores are stored in a Redis sorted set per post. The score packs strokes and ti
 - [x] Daily challenge with streaks, button zoom
 - [x] Bridges, tunnels, sliding obstacles
 - [x] Course editor (track, water, obstacles, test play, server drafts)
-- [ ] Publish community courses as posts, moderator featuring into dailies
+- [x] Publish community courses as posts
+- [ ] Moderator featuring of community courses into dailies
 - [ ] Creator rankings
 - [ ] Ramps and elevation
 - [ ] Server-side replay validation

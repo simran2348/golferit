@@ -102,6 +102,20 @@ export type SubmitRoundResponse = {
   countedForStreak: boolean;
 };
 
+/** Publish a verified editor design as a community post. */
+export type PublishRequest = {
+  design: CourseDesign;
+  /** The creator's winning test run, checked against the design. */
+  shots: ShotRecord[];
+  penalties: number;
+};
+
+export type PublishResponse = {
+  type: 'published';
+  postId: string;
+  url: string;
+};
+
 export type DraftResponse = {
   type: 'draft';
   /** Null when the user hasn't saved a draft yet. */

@@ -27,18 +27,26 @@ const isShotRecord = (value: unknown): value is ShotRecord =>
   'power' in value &&
   isFiniteNumber(value.power);
 
+/** Shots + penalties from an untrusted body (round submit or publish). */
+export const parseShotLog = (
+  body: unknown
+): { shots: ShotRecord[]; penalties: number } | null => {
+  if (typeof body !== 'object' || body === null) return null;
+  if (!('penalties' in body) || !Number.isInteger(body.penalties)) return null;
+  if (!('shots' in body) || !Array.isArray(body.shots)) return null;
+  const shots: unknown[] = body.shots;
+  if (!shots.every(isShotRecord)) return null;
+  return { shots, penalties: Number(body.penalties) };
+};
+
 /** Structural check of an untrusted request body. */
 export const parseSubmitRequest = (
   body: unknown
 ): SubmitRoundRequest | null => {
   if (typeof body !== 'object' || body === null) return null;
   if (!('roundId' in body) || typeof body.roundId !== 'string') return null;
-  if (!('penalties' in body) || !Number.isInteger(body.penalties)) return null;
-  if (!('shots' in body) || !Array.isArray(body.shots)) return null;
-  const shots: unknown[] = body.shots;
-  if (!shots.every(isShotRecord)) return null;
-  const penalties = Number(body.penalties);
-  return { roundId: body.roundId, penalties, shots };
+  const log = parseShotLog(body);
+  return log ? { roundId: body.roundId, ...log } : null;
 };
 
 export type ValidatedRound = {
@@ -59,7 +67,22 @@ export const validateRound = (
   course: CourseDefinition,
   serverElapsedMs: number
 ): ValidatedRound | string => {
-  const { shots, penalties } = request;
+  const log = validateShotLog(request.shots, request.penalties, course);
+  if (typeof log === 'string') return log;
+  if (serverElapsedMs < MIN_ROUND_MS) return 'Round finished impossibly fast';
+  if (serverElapsedMs > ROUND_TTL_SECONDS * 1000) return 'Round expired';
+  return { strokes: log.strokes, timeMs: serverElapsedMs };
+};
+
+/**
+ * The timing-free part of `validateRound`: is this a plausible shot log on
+ * this course? Also used to check a creator's run before publishing.
+ */
+export const validateShotLog = (
+  shots: readonly ShotRecord[],
+  penalties: number,
+  course: CourseDefinition
+): { strokes: number } | string => {
   if (shots.length < 1) return 'A round needs at least one shot';
   if (penalties < 0) return 'Invalid penalty count';
 
@@ -89,9 +112,5 @@ export const validateRound = (
   ) {
     return 'First shot must be from the tee';
   }
-
-  if (serverElapsedMs < MIN_ROUND_MS) return 'Round finished impossibly fast';
-  if (serverElapsedMs > ROUND_TTL_SECONDS * 1000) return 'Round expired';
-
-  return { strokes, timeMs: serverElapsedMs };
+  return { strokes };
 };

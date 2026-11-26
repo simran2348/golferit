@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { COURSE_CATALOG, DEFAULT_COURSE } from './courses/index.ts';
+import { createStarterDesign, withTile } from './editor/design.ts';
 import {
+  COMMUNITY_COURSE_ID,
+  courseForPost,
   challengeNumber,
   courseForDate,
   parsePostData,
@@ -148,5 +151,50 @@ describe('postLabel', () => {
       postLabel({ kind: 'practice', courseId: DEFAULT_COURSE.id }),
       'Practice'
     );
+  });
+});
+
+describe('community posts', () => {
+  const design = createStarterDesign();
+  const community = {
+    kind: 'community',
+    design,
+    author: 'green_putter',
+    creatorStrokes: 2,
+  };
+
+  test('valid community data round-trips through JSON', () => {
+    assert.deepEqual(
+      parsePostData(JSON.parse(JSON.stringify(community))),
+      community
+    );
+  });
+
+  test('builds its course from the design', () => {
+    const course = courseForPost(parsePostData(community));
+    assert.equal(course.id, COMMUNITY_COURSE_ID);
+    assert.equal(course.name, design.name);
+    assert.equal(course.par, design.par);
+  });
+
+  test('labels the post with its author', () => {
+    assert.equal(postLabel(parsePostData(community)), 'By u/green_putter');
+  });
+
+  test('bad community data falls back to the default course', () => {
+    const fallback = { kind: 'practice', courseId: DEFAULT_COURSE.id };
+    const bad: unknown[] = [
+      { ...community, design: { ...design, tiles: 'x' } },
+      // Parses, but no longer builds into a playable course.
+      { ...community, design: withTile(design, 0, 0, 'track') },
+      { ...community, author: '' },
+      { ...community, author: 'has spaces' },
+      { ...community, author: 7 },
+      { ...community, creatorStrokes: 0 },
+      { ...community, creatorStrokes: 11 },
+      { ...community, creatorStrokes: 2.5 },
+      { kind: 'community' },
+    ];
+    for (const value of bad) assert.deepEqual(parsePostData(value), fallback);
   });
 });

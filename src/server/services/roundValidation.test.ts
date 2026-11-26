@@ -7,7 +7,12 @@ import {
   ROUND_TTL_SECONDS,
 } from '../../shared/constants/game.ts';
 import { MEADOW_MILL } from '../../shared/courses/meadowMill.ts';
-import { parseSubmitRequest, validateRound } from './roundValidation.ts';
+import {
+  parseShotLog,
+  parseSubmitRequest,
+  validateRound,
+  validateShotLog,
+} from './roundValidation.ts';
 
 const course = MEADOW_MILL;
 const fromTee: ShotRecord = {
@@ -176,5 +181,27 @@ describe('validateRound', () => {
       ),
       'Shots out of order'
     );
+  });
+});
+
+describe('validateShotLog', () => {
+  test('checks the log without any timing rules', () => {
+    assert.deepEqual(validateShotLog([fromTee, approach], 1, course), {
+      strokes: 3,
+    });
+    assert.equal(
+      validateShotLog([{ ...fromTee, x: 0 }], 0, course),
+      'First shot must be from the tee'
+    );
+  });
+});
+
+describe('parseShotLog', () => {
+  test('needs no round id', () => {
+    assert.deepEqual(parseShotLog({ shots: [fromTee], penalties: 0 }), {
+      shots: [fromTee],
+      penalties: 0,
+    });
+    assert.equal(parseShotLog({ shots: [fromTee] }), null);
   });
 });
