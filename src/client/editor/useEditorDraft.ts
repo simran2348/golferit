@@ -117,6 +117,8 @@ export const useEditorDraft = () => {
   });
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('loading');
   const [savedDraft, setSavedDraft] = useState<CourseDesign | null>(null);
+  /** The server said nobody is logged in: nothing can be saved or published. */
+  const [loggedOut, setLoggedOut] = useState(false);
   const canSave = useRef(true);
 
   useEffect(() => {
@@ -133,6 +135,7 @@ export const useEditorDraft = () => {
         const unauthenticated =
           error instanceof ApiError && error.code === 'unauthenticated';
         canSave.current = !unauthenticated;
+        setLoggedOut(unauthenticated);
         setSaveStatus(unauthenticated ? 'unauthenticated' : 'error');
       });
     return () => {
@@ -151,7 +154,10 @@ export const useEditorDraft = () => {
         .catch((error: unknown) => {
           const unauthenticated =
             error instanceof ApiError && error.code === 'unauthenticated';
-          if (unauthenticated) canSave.current = false;
+          if (unauthenticated) {
+            canSave.current = false;
+            setLoggedOut(true);
+          }
           setSaveStatus(unauthenticated ? 'unauthenticated' : 'error');
         });
     }, AUTOSAVE_DELAY_MS);
@@ -178,6 +184,7 @@ export const useEditorDraft = () => {
     resumeDraft,
     canUndo: state.past.some((d) => d !== design),
     saveStatus,
+    loggedOut,
     strokeStart: useCallback(() => dispatch({ type: 'strokeStart' }), []),
     cancelStroke: useCallback(() => dispatch({ type: 'cancelStroke' }), []),
     paint: useCallback(

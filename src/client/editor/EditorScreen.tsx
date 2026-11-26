@@ -109,6 +109,7 @@ export const EditorScreen = () => {
   const [verifiedRun, setVerifiedRun] = useState<
     (VerifiedRun & { key: string }) | null
   >(null);
+  const [loginNoticeDismissed, setLoginNoticeDismissed] = useState(false);
   const [publishStep, setPublishStep] = useState<
     'closed' | 'confirm' | 'publishing'
   >('closed');
@@ -218,6 +219,26 @@ export const EditorScreen = () => {
         </button>
       </header>
 
+      {draft.loggedOut && !loginNoticeDismissed ? (
+        <div
+          role="status"
+          className="mx-2 mb-2 flex items-start gap-2 rounded-xl bg-amber-100 px-3 py-2 text-xs font-semibold text-amber-900 shadow"
+        >
+          <p className="min-w-0 flex-1">
+            You're not logged in, so this course won't be saved or published.
+            Log in to Reddit first if you want to keep it.
+          </p>
+          <button
+            type="button"
+            onClick={() => setLoginNoticeDismissed(true)}
+            aria-label="Dismiss"
+            className="-my-0.5 shrink-0 px-1 text-base leading-none font-black text-amber-700 hover:text-amber-950"
+          >
+            ×
+          </button>
+        </div>
+      ) : null}
+
       {/* Edit rail · grid · obstacle rail */}
       <div className="flex min-h-0 flex-1 gap-2 px-2">
         <ToolRail
@@ -283,7 +304,9 @@ export const EditorScreen = () => {
           >
             {build.ok
               ? verified
-                ? `You sank it in ${verified.strokes}. Ready to publish!`
+                ? draft.loggedOut
+                  ? `You sank it in ${verified.strokes}. Log in to publish.`
+                  : `You sank it in ${verified.strokes}. Ready to publish!`
                 : 'Looks playable! Test it to verify.'
               : `${build.errors[0] ?? ''}${build.errors.length > 1 ? ` (+${build.errors.length - 1} more)` : ''}`}
           </p>
@@ -300,10 +323,11 @@ export const EditorScreen = () => {
             </button>
             <button
               type="button"
+              disabled={draft.loggedOut}
               onClick={() => setPublishStep('confirm')}
-              className="shrink-0 rounded-full bg-emerald-600 px-5 py-3 font-extrabold text-white shadow-[0_4px_0_#047857] transition hover:bg-emerald-500 active:translate-y-1 active:shadow-[0_1px_0_#047857]"
+              className="shrink-0 rounded-full bg-emerald-600 px-5 py-3 font-extrabold text-white shadow-[0_4px_0_#047857] transition hover:bg-emerald-500 active:translate-y-1 active:shadow-[0_1px_0_#047857] disabled:bg-slate-400 disabled:text-sm disabled:shadow-none"
             >
-              Publish
+              {draft.loggedOut ? 'Log in to publish' : 'Publish'}
             </button>
           </>
         ) : (

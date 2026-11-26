@@ -199,7 +199,7 @@ Scores are stored in a Redis sorted set per post. The score packs strokes and ti
 
 ## Things to know
 
-- **Logged-out viewers** can play and see the leaderboard, but scores aren't saved.
+- **Logged-out viewers** can play and see the leaderboard, but scores aren't saved. They can also try the editor and test-play what they build, but a banner tells them up front that nothing will be saved, and **Publish** is replaced by a disabled "Log in to publish".
 - **Leaderboards are per post.** Each daily (and each practice post) has its own board.
 - **Days are UTC.** The daily post and streak days roll over at 00:00 UTC, which isn't midnight for most players.
 - **The timer is real elapsed time.** It keeps running if you switch tabs mid-round.
