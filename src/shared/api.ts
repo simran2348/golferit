@@ -18,21 +18,6 @@ export type InitResponse = {
   best: ScoreEntry | null;
   /** Null when logged out. */
   streak: StreakInfo | null;
-  /** Subreddit the app is installed in (where the Join button subscribes). */
-  subredditName: string;
-  /** True once the viewer has joined via the app's Join button. */
-  joined: boolean;
-  /** Viewer tapped Join and the post reloaded for consent: finish the join. */
-  pendingJoin: boolean;
-};
-
-export type JoinIntentResponse = {
-  type: 'joinIntent';
-};
-
-export type SubscribeResponse = {
-  type: 'subscribed';
-  subredditName: string;
 };
 
 export type ErrorCode =

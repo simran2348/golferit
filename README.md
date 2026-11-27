@@ -31,12 +31,6 @@ Every day a new **Daily Challenge** post appears with one of the built-in holes.
 - Works with mouse and touch; responsive from 360 px phones to desktop
 - Server-timed and server-validated scores, personal bests, and a leaderboard per post (Devvit Redis)
 
-## Joining the subreddit
-
-The splash shows a **＋ Join r/…** button to logged-in viewers. It calls `reddit.subscribeToCurrentSubreddit()` as the user, so it always joins **whichever subreddit the app is installed in**: the test sub during development, the public sub after launch, with no code change. This requires `"asUser": ["SUBSCRIBE_TO_SUBREDDIT"]` under `permissions.reddit` in `devvit.json`.
-
-Reddit doesn't let apps read a user's subscriptions, so the app remembers who joined through the button (`joined:<userId>` in Redis) and shows "✓ Joined" from then on. Someone who joined another way still sees the button; tapping it is a harmless no-op.
-
 ## Course editor
 
 Tap **🛠 Build your own course** on any Golferit post to open the editor.
@@ -194,7 +188,6 @@ Scores are stored in a Redis sorted set per post. The score packs strokes and ti
 | `POST /api/round/start`  | Begin an official, server-timed round                                    |
 | `POST /api/round/submit` | Validate and record a finished round                                     |
 | `GET /api/editor/draft`  | Your saved editor draft (logged in)                                      |
-| `POST /api/subscribe`    | Join the subreddit the app is installed in (as the user)                 |
 | `PUT /api/editor/draft`  | Save your editor draft (structure-checked)                               |
 
 ## Things to know

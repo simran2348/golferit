@@ -8,9 +8,6 @@ export type PlayerState =
       username: string | null;
       best: ScoreEntry | null;
       streak: StreakInfo | null;
-      subredditName: string;
-      joined: boolean;
-      pendingJoin: boolean;
     }
   | { status: 'error' };
 
@@ -40,9 +37,6 @@ export const usePlayer = (): PlayerState => {
           username: data.username,
           best: data.best,
           streak: data.streak,
-          subredditName: data.subredditName,
-          joined: data.joined,
-          pendingJoin: data.pendingJoin,
         });
       } catch (err) {
         if (controller.signal.aborted) return;

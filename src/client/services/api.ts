@@ -1,11 +1,9 @@
 import type {
   DraftResponse,
   ErrorCode,
-  JoinIntentResponse,
   PublishRequest,
   PublishResponse,
   SaveDraftResponse,
-  SubscribeResponse,
   LeaderboardResponse,
   StartRoundResponse,
   SubmitRoundRequest,
@@ -122,17 +120,3 @@ const isPublished = (v: unknown): v is PublishResponse =>
 /** Post a verified design to the subreddit as a community course. */
 export const publishCourse = (body: PublishRequest) =>
   request('/api/editor/publish', isPublished, postJson(body));
-
-const isSubscribed = (v: unknown): v is SubscribeResponse =>
-  hasType(v, 'subscribed');
-
-/** Join the subreddit the app is installed in, as the current user. */
-export const subscribeToSubreddit = () =>
-  request('/api/subscribe', isSubscribed, postJson({}));
-
-const isJoinIntent = (v: unknown): v is JoinIntentResponse =>
-  hasType(v, 'joinIntent');
-
-/** Remember a Join tap server-side so it survives Reddit's consent reload. */
-export const markJoinIntent = () =>
-  request('/api/join/intent', isJoinIntent, postJson({}));
